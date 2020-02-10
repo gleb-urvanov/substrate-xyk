@@ -10,6 +10,7 @@
 
 use frame_support::{decl_module, decl_storage, StorageValue, StorageMap, dispatch::DispatchResult};
 use system::ensure_signed;
+use codec::{Encode, Decode};
 
 /// The module's configuration trait.
 pub trait Trait: balances::Trait {
