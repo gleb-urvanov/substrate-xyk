@@ -33,10 +33,11 @@ pub trait Trait: system::Trait + balances::Trait {
 #[derive(Encode, Decode, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "std", derive(Debug))]
 pub struct Pool {
-    id: u64,
-    name: u64,
-    token1: u64,
-    token2: u64,
+    token1_id: u64,
+    token2_id: u64,
+    
+    token1_amount: u64, //get pool
+    token2_amount: u64,
 
 }
 
@@ -45,7 +46,7 @@ pub struct Pool {
 pub struct Token {
     id: u64,
     name: u64,
-    amount: u64,
+    
 }
 
 
@@ -62,19 +63,15 @@ decl_event!(
 decl_storage! {
     trait Store for Module<T: Trait> as XykStorage {
         // Declare storage and getter functions here
-        
+
+        //alicethepool wonderland
+        VaultId: T::AccountId;
        
-        Pools get(pool_by_id): map u64 => Pool;
+        Pools get(token_ids): map (u64, u64) => Pool;
         Tokens get(token_by_id): map u64 => Token;
 
-        AllPoolsCount get(all_pools_count): u64;
-        AllTokensCount get(all_tokens_count): u64;
-
-        TokenNames get(token_id_by_name):  map u64 => u64;
-        PoolNames get(pool_id_by_name):  map u64 => u64;
-      //  OwnedPoolsArray get(pool_of_owner_by_index): map (T::AccountId, u64) => T::Hash;
-        OwnedTokensArray get(token_of_owner_by_id): map (T::AccountId, u64) => Token;
-    }
+       
+    }      
 }
 
 // The module's dispatchable functions.
@@ -82,95 +79,175 @@ decl_module! {
     pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 
         fn deposit_event() = default;
+       
+        fn get_vault_id(origin) -> DispatchResult{
+            let sender = ensure_signed(origin)?;
+            ensure!(!<VaultId<T>>::exists(), "vault already initialized");
+            <VaultId<T>>::put(sender);
 
-        
+            Ok(())
+        }
 
-        fn create_pool(origin, token1_name: u64, token1_amount: u64, token2_name: u64, token2_amount: u64) -> DispatchResult {
+        fn create_pool(origin, token1_id: u64, token1_amount: u64, token2_id: u64, token2_amount: u64) -> DispatchResult {
+            //TO DO: create new user as pool_token1_token2
+           // let pool_id: T::AccountId = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY";
             let sender = ensure_signed(origin)?;
             
-            let mut token1_id: u64;
-            let mut token2_id: u64;
-            let primes = [2,    3,  5,  7,  11,     13,     17,     19,     23,     29, 
-            31,     37,     41,     43,     47,     53,     59,     61,     67,     71, 
-            73,     79,     83,     89,     97,     101,    103,    107,    109,    113, 
-            127,    131,    137,    139,    149,    151,    157,    163,    167,    173, 
-            179,    181,    191,    193,    197,    199,    211,    223,    227,    229, 
-            233,    239,    241,    251,    257,    263,    269,    271,    277,    281, 
-            ];
+            let vault_address: T::AccountId  = <VaultId<T>>::get();
+        //  let token1_id = <TokenNames>::get(token1_name);
+        //  let token2_id = <TokenNames>::get(token2_name);
 
-            if (!<TokenNames>::exists(token1_name)) {
-                token1_id = primes[(AllPoolsCount::get() as usize) + 1];
-                Self::create_token(token1_name, token1_id)?;
-            }
-            else {
-                token1_id = <TokenNames>::get(token1_name);
-            }
+            ensure!(!<Pools>::exists((token1_id,token2_id)), "Pools already exists");
+            ensure!(!<Pools>::exists((token2_id,token1_id)), "Pools already exists");
 
-            if (!<TokenNames>::exists(token2_name)) {          
-                token2_id = primes[(AllPoolsCount::get() as usize) + 1];
-                Self::create_token(token2_name, token2_id)?;
-            }
-            else {
-                token2_id = <TokenNames>::get(token2_name);
-            }
-           
-            let name = token1_id * token2_id;
-            let id = token1_id * token2_id;
-
-            ensure!(!<Pools>::exists(id), "Pools already exists");
-
-
+        //    TODO ensure sender has enought token1 token2 
+        //    ensure!(<TokenOwners<T>>::get((&sender, token1_id)) >= token1_amount), "not enought token1 amount");
+        //    ensure!(<TokenOwners<T>>::get((&sender, token2_id)) >= token2_amount), "not enought token1 amount");
 
             let new_pool = Pool {
-                id: id,
-                // id2: u64,
-                // token1: u64,
-                // token2: u64,
-                // token1id: u64,
-                // token2id: u64,
-
-                name: name,
-                token1: token1_amount,
-                token2: token2_amount,
+                token1_id: token1_id,
+                token2_id: token2_id,
+                
+                token1_amount: token1_amount, 
+                token2_amount: token1_amount, 
              
             };
 
 
+            <Pools>::insert((token1_id, token2_id), new_pool);
 
-            let all_pools_count = Self::all_pools_count();
-            let new_all_pools_count = all_pools_count.checked_add(1)
-            .ok_or("Overflow adding a new pool to total supply")?;
-            AllPoolsCount::put(new_all_pools_count);
-
-            <Pools>::insert(id, new_pool);
-            <PoolNames>::insert(name, id);
-     
-            //mint user tokens for pool and deduce tokens from user acc
-
+            
+        //  TODO fn_transfer 
+        //  sender - token1_amount
+        //  sender - token2_amount
+        //  vault + token1_amount
+        //  vault + token2_amount
 
             Ok(())
         }
     
+        // you will sell your token1_amount to get some token2_amount
+        fn buy_y_for_x (origin, token1_id: u64, token2_id: u64, token1_amount: u64, amount: u64) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+            let output_reserve: u64;
+            let input_reserve: u64;
+           
+        //  let token1_id = <TokenNames>::get(token1_name);
+        //  let token2_id = <TokenNames>::get(token2_name);
+
+        //  TODO ensure on token amount           
+        //  ensure!(<TokenOwners<T>>::get((&sender, token1_id)) >= token1_amount), "not enought token1 amount");
+
+            ensure!(<Pools>::exists((token1_id,token2_id)) || <Pools>::exists((token2_id,token1_id)), "no such pool, transfer zatial impossibru https://i.kym-cdn.com/entries/icons/original/000/004/918/imposibru.jpg" );
+            // TODO if pools do not exist, find cheapest way in matrix
+
+            // swap token1 for token2
+            if  <Pools>::exists((token1_id,token2_id)){
+                input_reserve = (<Pools>::get((token1_id, token2_id))).token1_amount; 
+                output_reserve = (<Pools>::get((token1_id, token2_id))).token2_amount;
+                ensure!(output_reserve > 0, "not enought reserve"); 
+                ensure!(input_reserve > 0, "not enought reserve");
+                let dy = Self::get_input_price(input_reserve, output_reserve, amount);
+                let mut new_pool = <Pools>::get((token1_id, token2_id));
+                new_pool.token1_amount = input_reserve + token1_amount;
+                new_pool.token2_amount = output_reserve -dy;
+                <Pools>::insert((token1_id, token2_id), new_pool);
+                
+            }
+            // swap token2 for token1
+            else{
+                output_reserve = (<Pools>::get((token1_id, token2_id))).token1_amount; 
+                input_reserve = (<Pools>::get((token1_id, token2_id))).token2_amount;
+                ensure!(output_reserve > 0, "not enought reserve"); 
+                ensure!(input_reserve > 0, "not enought reserve");
+                let dy = Self::get_input_price(input_reserve, output_reserve, amount);
+                let mut new_pool = <Pools>::get((token2_id, token1_id));
+                new_pool.token1_amount = input_reserve - dy;
+                new_pool.token2_amount = output_reserve + token1_amount;
+                <Pools>::insert((token2_id, token1_id), new_pool);
+            }
+
+            //TODO transfer fn
+            // sender - token1_amount
+            // sender + dy
+            // vault + token1_amount
+            // vault - dy
+
+            Ok(())
+        }
+
+        // you will buy token1_amount with some of your token2_amount
+        fn buy_x_for_y (origin, token1_id: u64, token2_id: u64, token1_amount: u64, amount: u64) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+            let output_reserve: u64;
+            let input_reserve: u64;
+           
+        //  let token1_id = <TokenNames>::get(token1_name);
+        //  let token2_id = <TokenNames>::get(token2_name);
+
+        //  TODO ensure on token amount           
+        //  ensure!(<TokenOwners<T>>::get((&sender, token1_id)) >= token1_amount), "not enought token1 amount");
+
+            ensure!(<Pools>::exists((token1_id,token2_id)) || <Pools>::exists((token2_id,token1_id)), "no such pool, transfer zatial impossibru https://i.kym-cdn.com/entries/icons/original/000/004/918/imposibru.jpg"  );
+            // TODO if pools do not exist, find cheapest way in matrix
+
+            // swap token1 for token2
+            if  <Pools>::exists((token1_id,token2_id)){
+                input_reserve = (<Pools>::get((token1_id, token2_id))).token1_amount; 
+                output_reserve = (<Pools>::get((token1_id, token2_id))).token2_amount;
+                ensure!(output_reserve > 0, "not enought reserve"); 
+                ensure!(input_reserve > 0, "not enought reserve");
+                let dy = Self::get_output_price(input_reserve, output_reserve, amount);
+                let mut new_pool = <Pools>::get((token1_id, token2_id));
+                new_pool.token1_amount = input_reserve + token1_amount;
+                new_pool.token2_amount = output_reserve -dy;
+                <Pools>::insert((token1_id, token2_id), new_pool);
+                
+            }
+            // swap token2 for token1
+            else{
+                output_reserve = (<Pools>::get((token1_id, token2_id))).token1_amount; 
+                input_reserve = (<Pools>::get((token1_id, token2_id))).token2_amount;
+                ensure!(output_reserve > 0, "not enought reserve"); 
+                ensure!(input_reserve > 0, "not enought reserve");
+                let dy = Self::get_output_price(input_reserve, output_reserve, amount);
+                let mut new_pool = <Pools>::get((token2_id, token1_id));
+                new_pool.token1_amount = input_reserve - dy;
+                new_pool.token2_amount = output_reserve + token1_amount;
+                <Pools>::insert((token2_id, token1_id), new_pool);
+            }
+
+            //TODO transfer fn
+            // sender - token1_amount
+            // sender + dy
+            // vault + token1_amount
+            // vault - dy
+
+            Ok(())
+        }
+
     }
 }
 
 
 impl<T: Trait> Module<T> {
-    fn create_token (name: u64, id: u64) -> DispatchResult {
-        let new_token = Token {
-            id: id,
-            name: name,
-            amount: 0,
-        };
 
-        let all_tokens_count = Self::all_tokens_count();
-        let new_all_tokens_count = all_tokens_count.checked_add(1)
-        .ok_or("Overflow adding a new token to total supply")?;
-        AllTokensCount::put(new_all_tokens_count);
-
-        <Tokens>::insert(id, new_token);
-        <TokenNames>::insert(name, id);
-
-        Ok(())  
+    fn get_input_price (input_reserve: u64, output_reserve: u64, input_amount: u64) -> u64 {
+        // input_amount_with_fee: uint256 = input_amount * 997
+        let input_amount_with_fee: u64 = input_amount * 997;
+        // numerator: uint256 = input_amount_with_fee * output_reserve
+        let numenator: u64 = input_amount_with_fee * output_reserve;
+        // denominator: uint256 = (input_reserve * 1000) + input_amount_with_fee
+        let denominator: u64 = (input_reserve * 1000) + input_amount_with_fee;
+        numenator / denominator
     }
+
+    fn get_output_price (input_reserve: u64, output_reserve: u64, output_amount: u64) -> u64 {
+        // numerator: uint256 = input_reserve * output_amount * 1000
+        let numenator: u64 = input_reserve * output_amount * 1000;
+        // denominator: uint256 = (output_reserve - output_amount) * 997
+        let denominator: u64 = (output_reserve - output_amount) * 997;
+        numenator / denominator
+    }
+
 }
