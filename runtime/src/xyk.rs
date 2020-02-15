@@ -10,10 +10,13 @@
 
 use frame_support::{decl_module, decl_storage, StorageValue, StorageMap, dispatch::DispatchResult};
 use system::ensure_signed;
-use codec::{Encode, Decode};
+// /use codec::{Encode, Decode};
+//use assets as assets;
+use generic_asset::{AssetOptions, Owner, PermissionLatest};
+use sp_runtime::traits::{Hash, SaturatedConversion};
 
 /// The module's configuration trait.
-pub trait Trait: balances::Trait {
+pub trait Trait: generic_asset::Trait {
 	// TODO: Add other types and constants required configure this module.
 
 	// The overarching event type.
@@ -59,6 +62,20 @@ decl_module! {
             <OwnedY<T>>::insert(sender, sum);
 
             Ok(())
+        }
+
+        fn mint_asset_x(origin, amount: T::Balance) {
+            let sender = ensure_signed(origin)?;
+            let default_permission = PermissionLatest {
+                update: Owner::Address(sender.clone()),
+                mint: Owner::Address(sender.clone()),
+                burn: Owner::Address(sender.clone()),
+            };
+            <generic_asset::Module<T>>::create_asset(None, Some(sender), AssetOptions {
+                initial_issuance: amount,
+                permissions: default_permission,
+            })?;
+            //Assets.issue(amount);
         }
 
         fn set_default_values(origin) -> DispatchResult {

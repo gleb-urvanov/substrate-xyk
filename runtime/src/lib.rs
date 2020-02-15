@@ -36,6 +36,7 @@ pub use frame_support::{
 	traits::Randomness,
 	weights::Weight,
 };
+use generic_asset::{SpendingAssetCurrency, AssetCurrency, AssetIdProvider};
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -243,6 +244,19 @@ impl template::Trait for Runtime {
 	type Event = Event;
 }
 
+impl assets::Trait for Runtime {
+	type Balance = Balance;
+	type AssetId = u32;
+	type Event = Event;
+}
+
+impl generic_asset::Trait for Runtime {
+    /// The type for recording an account's balance.
+    type Balance = Balance;
+    type AssetId = u32;
+    type Event = Event;
+}
+
 impl xyk::Trait for Runtime {
 
 }
@@ -263,6 +277,8 @@ construct_runtime!(
 		Sudo: sudo,
 		// Used for the module template in `./template.rs`
 		TemplateModule: template::{Module, Call, Storage, Event<T>},
+		Assets: assets::{Module, Call, Storage, Event<T>},
+		GenericAsset: generic_asset,
 		Xyk: xyk::{Module, Call, Storage},
 		RandomnessCollectiveFlip: randomness_collective_flip::{Module, Call, Storage},
 	}
