@@ -7,91 +7,170 @@
 
 /// For more guidance on Substrate modules, see the example module
 /// https://github.com/paritytech/substrate/blob/master/frame/example/src/lib.rs
+//use crate::parity_scale_codec::{Encode, Decode};
+//use sr_primitives::traits::{As, Hash};
 
-use frame_support::{decl_module, decl_storage, StorageValue, StorageMap, dispatch::DispatchResult};
-use system::ensure_signed;
+use crate::sp_api_hidden_includes_construct_runtime::hidden_include::sp_runtime::traits::SaturatedConversion;
+use sp_std::convert::TryInto;
+use sp_runtime::traits::{Hash};
 use codec::{Encode, Decode};
+use frame_support::{decl_storage, decl_module, StorageValue, StorageMap,
+    dispatch::DispatchResult, ensure, decl_event, traits::Randomness, traits::Currency};
+//use frame_support::{decl_module, decl_storage, StorageValue, StorageMap, dispatch::DispatchResult};
+use system::ensure_signed;
+use randomness_collective_flip;
 
-/// The module's configuration trait.
-pub trait Trait: balances::Trait {
-	// TODO: Add other types and constants required configure this module.
 
-	// The overarching event type.
-	//type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
+
+pub trait Trait: system::Trait + balances::Trait {
+    // TODO: Add other types and constants required configure this module.
+
+    /// The overarching event type.
+    type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
+
+
+#[derive(Encode, Decode, Default, Clone, PartialEq)]
+#[cfg_attr(feature = "std", derive(Debug))]
+pub struct Pool {
+    id: u64,
+    name: u64,
+    token1: u64,
+    token2: u64,
+
+}
+
+#[derive(Encode, Decode, Default, Clone, PartialEq)]
+#[cfg_attr(feature = "std", derive(Debug))]
+pub struct Token {
+    id: u64,
+    name: u64,
+    amount: u64,
+}
+
+
+decl_event!(
+    pub enum Event<T> where AccountId = <T as system::Trait>::AccountId {
+        // Just a dummy event.
+        // Event `Something` is declared with a parameter of the type `u32` and `AccountId`
+        // To emit this event, we call the deposit funtion, from our runtime funtions
+        SomethingStored(u32, AccountId),
+    }
+);
 
 // This module's storage items.
 decl_storage! {
-	trait Store for Module<T: Trait> as XykStorage {
+    trait Store for Module<T: Trait> as XykStorage {
         // Declare storage and getter functions here
-        OwnedX: map T::AccountId => u64;
-        OwnedY: map T::AccountId => u64;
+        
+       
+        Pools get(pool_by_id): map u64 => Pool;
+        Tokens get(token_by_id): map u64 => Token;
 
-        PoolX: u64;
-        PoolY: u64;
+        AllPoolsCount get(all_pools_count): u64;
+        AllTokensCount get(all_tokens_count): u64;
 
-        FeeSignificand: u16;
-        FeeDecimals: u16;
+        TokenNames get(token_id_by_name):  map u64 => u64;
+        PoolNames get(pool_id_by_name):  map u64 => u64;
+      //  OwnedPoolsArray get(pool_of_owner_by_index): map (T::AccountId, u64) => T::Hash;
+        OwnedTokensArray get(token_of_owner_by_id): map (T::AccountId, u64) => Token;
     }
 }
 
 // The module's dispatchable functions.
 decl_module! {
-	/// The module declaration.
-	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-		// Initializing events
-		// this is needed only if you are using events in your module
-		fn mint_x(origin, value: u64) -> DispatchResult {
+    pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+
+        fn deposit_event() = default;
+
+        
+
+        fn create_pool(origin, token1_name: u64, token1_amount: u64, token2_name: u64, token2_amount: u64) -> DispatchResult {
             let sender = ensure_signed(origin)?;
+            
+            let mut token1_id: u64;
+            let mut token2_id: u64;
+            let primes = [2,    3,  5,  7,  11,     13,     17,     19,     23,     29, 
+            31,     37,     41,     43,     47,     53,     59,     61,     67,     71, 
+            73,     79,     83,     89,     97,     101,    103,    107,    109,    113, 
+            127,    131,    137,    139,    149,    151,    157,    163,    167,    173, 
+            179,    181,    191,    193,    197,    199,    211,    223,    227,    229, 
+            233,    239,    241,    251,    257,    263,    269,    271,    277,    281, 
+            ];
 
-            let sum = <OwnedX<T>>::get(&sender) + value;
+            if (!<TokenNames>::exists(token1_name)) {
+                token1_id = primes[(AllPoolsCount::get() as usize) + 1];
+                Self::create_token(token1_name, token1_id)?;
+            }
+            else {
+                token1_id = <TokenNames>::get(token1_name);
+            }
 
-            <OwnedX<T>>::insert(sender, sum);
+            if (!<TokenNames>::exists(token2_name)) {          
+                token2_id = primes[(AllPoolsCount::get() as usize) + 1];
+                Self::create_token(token2_name, token2_id)?;
+            }
+            else {
+                token2_id = <TokenNames>::get(token2_name);
+            }
+           
+            let name = token1_id * token2_id;
+            let id = token1_id * token2_id;
+
+            ensure!(!<Pools>::exists(id), "Pools already exists");
+
+
+
+            let new_pool = Pool {
+                id: id,
+                // id2: u64,
+                // token1: u64,
+                // token2: u64,
+                // token1id: u64,
+                // token2id: u64,
+
+                name: name,
+                token1: token1_amount,
+                token2: token2_amount,
+             
+            };
+
+
+
+            let all_pools_count = Self::all_pools_count();
+            let new_all_pools_count = all_pools_count.checked_add(1)
+            .ok_or("Overflow adding a new pool to total supply")?;
+            AllPoolsCount::put(new_all_pools_count);
+
+            <Pools>::insert(id, new_pool);
+            <PoolNames>::insert(name, id);
+     
+            //mint user tokens for pool and deduce tokens from user acc
+
 
             Ok(())
         }
+    
+    }
+}
 
-        fn mint_y(origin, value: u64) -> DispatchResult {
-            let sender = ensure_signed(origin)?;
 
-            let sum = <OwnedY<T>>::get(&sender) + value;
+impl<T: Trait> Module<T> {
+    fn create_token (name: u64, id: u64) -> DispatchResult {
+        let new_token = Token {
+            id: id,
+            name: name,
+            amount: 0,
+        };
 
-            <OwnedY<T>>::insert(sender, sum);
+        let all_tokens_count = Self::all_tokens_count();
+        let new_all_tokens_count = all_tokens_count.checked_add(1)
+        .ok_or("Overflow adding a new token to total supply")?;
+        AllTokensCount::put(new_all_tokens_count);
 
-            Ok(())
-        }
+        <Tokens>::insert(id, new_token);
+        <TokenNames>::insert(name, id);
 
-        fn set_default_values(origin) -> DispatchResult {
-            let sender = ensure_signed(origin)?;
-            PoolX::put(10000 as u64); 
-            PoolY::put(10000 as u64);
-            FeeSignificand::put(3 as u16);
-            FeeDecimals::put(2 as u16);
-
-            Ok(())
-        } 
-
-        fn swap_x_for_y(origin, x_amount: u64) -> DispatchResult {
-            let sender = ensure_signed(origin)?;
-            let x = PoolX::get() as f64;
-            let y = PoolY::get() as f64;
-            let dx = x_amount as f64;
-            let a = dx/x;
-            let x1 = (1.0 + a) * x;
-            let base = 10 as f64;
-            let p = (FeeSignificand::get() as f64) / (100 as f64);
-            let g = 1.0 - p;
-            let dy = (a * g * y) / (1.0 + (a * g));
-            let y1 = y - dy;
-
-            let balanceX = <OwnedX<T>>::get(&sender) - x_amount;
-            <OwnedX<T>>::insert(&sender, balanceX);
-            let balanceY = <OwnedY<T>>::get(&sender) + (dy as u64);
-            <OwnedY<T>>::insert(&sender, balanceY);
-            PoolX::put(x1 as u64);
-            PoolY::put(y1 as u64);
-
-            Ok(())
-        }
-	}
+        Ok(())  
+    }
 }

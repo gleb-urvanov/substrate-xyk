@@ -244,7 +244,7 @@ impl template::Trait for Runtime {
 }
 
 impl xyk::Trait for Runtime {
-
+	type Event = Event;
 }
 
 construct_runtime!(
@@ -263,7 +263,7 @@ construct_runtime!(
 		Sudo: sudo,
 		// Used for the module template in `./template.rs`
 		TemplateModule: template::{Module, Call, Storage, Event<T>},
-		Xyk: xyk::{Module, Call, Storage},
+		Xyk: xyk::{Module, Call, Storage, Event<T>},
 		RandomnessCollectiveFlip: randomness_collective_flip::{Module, Call, Storage},
 	}
 );
