@@ -12,6 +12,13 @@ package = 'pallet-balances'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '2.0.0'
 
+[dependencies.generic-asset]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-generic-asset'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
 [dependencies.codec]
 default-features = false
 features = ['derive']
@@ -162,6 +169,7 @@ version = '2.0.0'
 default = ['std']
 std = [
     'aura/std',
+    'generic-asset/std',
     'balances/std',
     'codec/std',
     'frame-executive/std',

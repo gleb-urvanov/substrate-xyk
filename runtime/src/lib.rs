@@ -24,6 +24,7 @@ use grandpa::fg_primitives;
 use sp_version::RuntimeVersion;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
+use generic_asset;
 
 // A few exports that help ease life for downstream crates.
 #[cfg(any(feature = "std", test))]
@@ -238,6 +239,13 @@ impl sudo::Trait for Runtime {
 	type Proposal = Call;
 }
 
+impl generic_asset::Trait for Runtime {
+    /// The type for recording an account's balance.
+    type Balance = Balance;
+    type AssetId = u32;
+    type Event = Event;
+}
+
 /// Used for the module template in `./template.rs`
 impl template::Trait for Runtime {
 	type Event = Event;
@@ -261,6 +269,7 @@ construct_runtime!(
 		Balances: balances,
 		TransactionPayment: transaction_payment::{Module, Storage},
 		Sudo: sudo,
+		GenericAsset: generic_asset,
 		// Used for the module template in `./template.rs`
 		TemplateModule: template::{Module, Call, Storage, Event<T>},
 		Xyk: xyk::{Module, Call, Storage, Event<T>},
