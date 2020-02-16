@@ -141,7 +141,7 @@ decl_module! {
                 let dy = Self::get_input_price(input_reserve, output_reserve, amount);
                 let mut new_pool = <Pools<T>>::get((token1_id, token2_id));
                 new_pool.token1_amount = input_reserve + token1_amount;
-                new_pool.token2_amount = output_reserve -dy;
+                new_pool.token2_amount = output_reserve - dy;
                 <Pools<T>>::insert((token1_id, token2_id), new_pool);
 
                 let vault = <VaultId<T>>::get();
