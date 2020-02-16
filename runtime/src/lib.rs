@@ -36,7 +36,7 @@ pub use frame_support::{
 	traits::Randomness,
 	weights::Weight,
 };
-use generic_asset::{SpendingAssetCurrency, AssetCurrency, AssetIdProvider};
+use generic_asset;
 
 /// An index to a block.
 pub type BlockNumber = u32;

@@ -35,6 +35,8 @@ decl_storage! {
 
         FeeSignificand: u16;
         FeeDecimals: u16;
+
+        TotalBalance: T::Balance;
     }
 }
 
@@ -42,6 +44,7 @@ decl_storage! {
 decl_module! {
 	/// The module declaration.
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+
 		// Initializing events
 		// this is needed only if you are using events in your module
 		fn mint_x(origin, value: u64) -> DispatchResult {
@@ -64,18 +67,25 @@ decl_module! {
             Ok(())
         }
 
-        fn mint_asset_x(origin, amount: T::Balance) {
+        fn mint_asset_x(origin, amount: T::Balance, asset_id: T::AssetId) {
             let sender = ensure_signed(origin)?;
             let default_permission = PermissionLatest {
                 update: Owner::Address(sender.clone()),
                 mint: Owner::Address(sender.clone()),
                 burn: Owner::Address(sender.clone()),
             };
-            <generic_asset::Module<T>>::create_asset(None, Some(sender), AssetOptions {
+            <generic_asset::Module<T>>::create_asset(None, Some(sender.clone()), AssetOptions {
                 initial_issuance: amount,
                 permissions: default_permission,
             })?;
+            //let asset_id = 100;
+            <TotalBalance<T>>::put(<generic_asset::Module<T>>::free_balance(&asset_id, &sender));
             //Assets.issue(amount);
+        }
+
+        fn transfer_asset_x(origin, asset_id: T::AssetId, amount: T::Balance, to: T::AccountId) {
+            let sender = ensure_signed(origin.clone())?;
+            <generic_asset::Module<T>>::transfer(origin, asset_id, to, amount);
         }
 
         fn set_default_values(origin) -> DispatchResult {
