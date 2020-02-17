@@ -1,14 +1,6 @@
-/// A runtime module template with necessary imports
-
-/// Feel free to remove or edit this file as needed.
-/// If you change the name of this file, make sure to update its references in runtime/src/lib.rs
-/// If you remove this file, you can remove those references
-
-
 /// For more guidance on Substrate modules, see the example module
 /// https://github.com/paritytech/substrate/blob/master/frame/example/src/lib.rs
-//use crate::parity_scale_codec::{Encode, Decode};
-//use sr_primitives::traits::{As, Hash};
+//TODO documentation!
 
 use crate::sp_api_hidden_includes_construct_runtime::hidden_include::sp_runtime::traits::SaturatedConversion;
 use codec::{Encode, Decode};
@@ -30,11 +22,11 @@ pub trait Trait: generic_asset::Trait {
 #[derive(Encode, Decode, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "std", derive(Debug))]
 pub struct Pool<AssetId, Balance> {
-    token1_id: AssetId,
-    token2_id: AssetId,
+    first_asset_id: AssetId,
+    second_asset_id: AssetId,
     
-    token1_amount: Balance, //get pool
-    token2_amount: Balance,
+    first_asset_amount: Balance,
+    second_asset_amount: Balance,
 
 }
 
@@ -59,8 +51,6 @@ decl_event!(
 // This module's storage items.
 decl_storage! {
     trait Store for Module<T: Trait> as XykStorage {
-        // Declare storage and getter functions here
-
         //alicethepool wonderland
         VaultId: T::AccountId;
        
@@ -85,89 +75,83 @@ decl_module! {
             Ok(())
         }
 
-        fn create_pool(origin, token1_id: T::AssetId, token1_amount: T::Balance, token2_id: T::AssetId, token2_amount: T::Balance) -> DispatchResult {
+        fn create_pool(origin, first_asset_id: T::AssetId, first_asset_amount: T::Balance, second_asset_id: T::AssetId, second_asset_amount: T::Balance) -> DispatchResult {
             //TO DO: create new user as pool_token1_token2
            // let pool_id: T::AccountId = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY";
             let sender = ensure_signed(origin.clone())?;
             
             let vault_address: T::AccountId  = <VaultId<T>>::get();
 
-            ensure!(!<Pools<T>>::exists((token1_id,token2_id)), "Pools already exists");
-            ensure!(!<Pools<T>>::exists((token2_id,token1_id)), "Pools already exists");
+            ensure!(!<Pools<T>>::exists((first_asset_id,second_asset_id)), "Pools already exists");
+            ensure!(!<Pools<T>>::exists((second_asset_id,first_asset_id)), "Pools already exists");
 
         //    TODO ensure sender has enought token1 token2 
-        //    ensure!(<TokenOwners<T>>::get((&sender, token1_id)) >= token1_amount), "not enought token1 amount");
-        //    ensure!(<TokenOwners<T>>::get((&sender, token2_id)) >= token2_amount), "not enought token1 amount");
 
             let new_pool = Pool {
-                token1_id: token1_id.clone(),
-                token2_id: token2_id.clone(),
+                first_asset_id: first_asset_id.clone(),
+                second_asset_id: second_asset_id.clone(),
                 
-                token1_amount: token1_amount.clone(), 
-                token2_amount: token1_amount.clone(), 
+                first_asset_amount: first_asset_amount.clone(), 
+                second_asset_amount: second_asset_amount.clone(), 
              
             };
 
-
-            <Pools<T>>::insert((token1_id, token2_id), new_pool);
-
             <generic_asset::Module<T>>::make_transfer_with_event(
-                &token1_id, &sender, &vault_address, token1_amount.clone());
+                &first_asset_id, &sender, &vault_address, first_asset_amount.clone())?;
             <generic_asset::Module<T>>::make_transfer_with_event(
-                &token2_id, &sender, &vault_address, token2_amount.clone());
+                &second_asset_id, &sender, &vault_address, second_asset_amount.clone())?;
+                
+            <Pools<T>>::insert((first_asset_id, second_asset_id), new_pool);
 
             Ok(())
         }
     
-        // you will sell your token1_amount to get some token2_amount
-        fn buy_y_for_x (origin, token1_id: T::AssetId, token2_id: T::AssetId, token1_amount: T::Balance) -> DispatchResult {
+        // you will sell your sold_asset_amount of sold_asset_id to get some amount of bought_asset_id
+        fn sell_asset (origin, sold_asset_id: T::AssetId, bought_asset_id: T::AssetId, sold_asset_amount: T::Balance) -> DispatchResult {
             let sender = ensure_signed(origin)?;
-            let output_reserve: T::Balance;
-            let input_reserve: T::Balance;
-           
 
-        //  TODO ensure on token amount           
-        //  ensure!(<TokenOwners<T>>::get((&sender, token1_id)) >= token1_amount), "not enought token1 amount");
+            //  TODO ensure on token amount           
+            //  ensure!(<TokenOwners<T>>::get((&sender, first_asset_id)) >= first_asset_amount), "not enought token1 amount");
 
-            ensure!(<Pools<T>>::exists((token1_id,token2_id)) || <Pools<T>>::exists((token2_id,token1_id)), "no such pool, transfer zatial impossibru https://i.kym-cdn.com/entries/icons/original/000/004/918/imposibru.jpg" );
-            // TODO if pools do not exist, find cheapest way in matrix
+            ensure!(<Pools<T>>::exists((sold_asset_id,bought_asset_id)) || <Pools<T>>::exists((bought_asset_id, sold_asset_id)), "no such pool");
 
-            // swap token1 for token2
-            if  <Pools<T>>::exists((token1_id,token2_id)){
-                input_reserve = (<Pools<T>>::get((token1_id, token2_id))).token1_amount; 
-                output_reserve = (<Pools<T>>::get((token1_id, token2_id))).token2_amount;
-                ensure!(output_reserve > 0.saturated_into::<T::Balance>(), "not enought reserve"); 
-                ensure!(input_reserve > 0.saturated_into::<T::Balance>(), "not enought reserve");
-                let dy = Self::get_input_price(input_reserve, output_reserve, token1_amount);
-                let mut new_pool = <Pools<T>>::get((token1_id, token2_id));
-                new_pool.token1_amount = input_reserve + token1_amount;
-                new_pool.token2_amount = output_reserve - dy;
-                <Pools<T>>::insert((token1_id, token2_id), new_pool);
+            if <Pools<T>>::exists((sold_asset_id,bought_asset_id)) {
+                let pool = <Pools<T>>::get((sold_asset_id, bought_asset_id));
+                let input_reserve = pool.first_asset_amount;
+                let output_reserve = pool.second_asset_amount;
+
+                let bought_asset_amount = Self::calculate_input_price(input_reserve, output_reserve, sold_asset_amount);
+                ensure!(output_reserve > bought_asset_amount, "not enought reserve"); 
+                let mut new_pool = pool.clone();
+
+                new_pool.first_asset_amount = input_reserve + sold_asset_amount;
+                new_pool.second_asset_amount = output_reserve - bought_asset_amount;
+
+                //TODO asserts!
 
                 let vault = <VaultId<T>>::get();
+                <generic_asset::Module<T>>::make_transfer_with_event(&sold_asset_id, &sender, &vault, sold_asset_amount)?;
+                <generic_asset::Module<T>>::make_transfer_with_event(&bought_asset_id, &vault, &sender, bought_asset_amount)?;
+                <Pools<T>>::insert((sold_asset_id, bought_asset_id), new_pool);
+            } else {
+                //TODO refactor to avoid code duplication
+                let pool = <Pools<T>>::get((bought_asset_id, sold_asset_id));
+                let input_reserve = pool.second_asset_amount;
+                let output_reserve = pool.first_asset_amount;
 
-                //TODO transfer fn
-                // sender - token1_amount
-                // sender + dy
-                // vault + token1_amount
-                // vault - dy
-                <generic_asset::Module<T>>::make_transfer_with_event(&token1_id, &sender, &vault, token1_amount);
-                <generic_asset::Module<T>>::make_transfer_with_event(&token2_id, &vault, &sender, dy);
+                let bought_asset_amount = Self::calculate_input_price(input_reserve, output_reserve, sold_asset_amount);
+                ensure!(output_reserve > bought_asset_amount, "not enought reserve"); 
+                let mut new_pool = pool.clone();
+
+                new_pool.second_asset_amount = input_reserve + sold_asset_amount;
+                new_pool.first_asset_amount = output_reserve - bought_asset_amount;
+
+                let vault = <VaultId<T>>::get();
+                <generic_asset::Module<T>>::make_transfer_with_event(&sold_asset_id, &sender, &vault, sold_asset_amount)?;
+                <generic_asset::Module<T>>::make_transfer_with_event(&bought_asset_id, &vault, &sender, bought_asset_amount)?;
+                <Pools<T>>::insert((bought_asset_id, sold_asset_id), new_pool);
             }
 
-            // swap token2 for token1
-            //TODO remove code duplication. Find the smart way to operate with pools!
-            // else{
-            //     output_reserve = (<Pools>::get((token1_id, token2_id))).token1_amount; 
-            //     input_reserve = (<Pools>::get((token1_id, token2_id))).token2_amount;
-            //     ensure!(output_reserve > 0, "not enought reserve"); 
-            //     ensure!(input_reserve > 0, "not enought reserve");
-            //     let dy = Self::get_input_price(input_reserve, output_reserve, amount);
-            //     let mut new_pool = <Pools>::get((token2_id, token1_id));
-            //     new_pool.token1_amount = input_reserve - dy;
-            //     new_pool.token2_amount = output_reserve + token1_amount;
-            //     <Pools>::insert((token2_id, token1_id), new_pool);
-            // }
 
             Ok(())
         }
@@ -178,7 +162,7 @@ decl_module! {
 
 impl<T: Trait> Module<T> {
 
-    fn get_input_price (input_reserve: T::Balance, output_reserve: T::Balance, input_amount: T::Balance) -> T::Balance {
+    pub fn calculate_input_price (input_reserve: T::Balance, output_reserve: T::Balance, input_amount: T::Balance) -> T::Balance {
         // input_amount_with_fee: uint256 = input_amount * 997
         let input_amount_with_fee = input_amount * 997.saturated_into::<T::Balance>();
         // numerator: uint256 = input_amount_with_fee * output_reserve
@@ -188,12 +172,26 @@ impl<T: Trait> Module<T> {
         numenator / denominator
     }
 
-    fn get_output_price (input_reserve: T::Balance, output_reserve: T::Balance, output_amount: T::Balance) -> T::Balance {
+    pub fn calculate_output_price (input_reserve: T::Balance, output_reserve: T::Balance, output_amount: T::Balance) -> T::Balance {
         // numerator: uint256 = input_reserve * output_amount * 1000
         let numenator = input_reserve * output_amount * 1000.saturated_into::<T::Balance>();
         // denominator: uint256 = (output_reserve - output_amount) * 997
         let denominator = (output_reserve - output_amount) * 997.saturated_into::<T::Balance>();
-        numenator / denominator
+        numenator / denominator + 1.saturated_into::<T::Balance>()
+    }
+
+    //Read-only function to be used by RPC
+    pub fn get_exchange_input_price(input_asset_id: T::AssetId, output_asset_id: T::AssetId, input_amount: T::Balance) -> T::Balance {
+        let pool = <Pools<T>>::get((input_asset_id, output_asset_id));
+        let output_amount = Self::calculate_input_price(pool.first_asset_amount, pool.second_asset_amount, input_amount);
+        output_amount
+    }
+
+    //Read-only function to be used by RPC
+    pub fn get_exchange_output_price(input_asset_id: T::AssetId, output_asset_id: T::AssetId, output_amount: T::Balance) -> T::Balance {
+        let pool = <Pools<T>>::get((input_asset_id, output_asset_id));
+        let input_amount = Self::calculate_output_price(pool.first_asset_amount, pool.second_asset_amount, output_amount);
+        input_amount
     }
 
 }
