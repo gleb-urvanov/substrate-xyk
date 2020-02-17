@@ -118,9 +118,9 @@ decl_module! {
             let input_reserve = pool.first_asset_amount;
             let output_reserve = pool.second_asset_amount;
             ensure!(input_reserve > sold_asset_amount, "not enought reserve");
-            let bought_asset_amount = Self::get_input_price(input_reserve, output_reserve, sold_asset_amount);
+            let bought_asset_amount = Self::calculate_input_price(input_reserve, output_reserve, sold_asset_amount);
             ensure!(output_reserve > bought_asset_amount, "not enought reserve"); 
-            let mut new_pool = <Pools<T>>::get((sold_asset_id, bought_asset_id));
+            let mut new_pool = pool.clone();
             new_pool.first_asset_amount = input_reserve + sold_asset_amount;
             new_pool.second_asset_amount = output_reserve - bought_asset_amount;
 
@@ -141,7 +141,7 @@ decl_module! {
 
 impl<T: Trait> Module<T> {
 
-    fn get_input_price (input_reserve: T::Balance, output_reserve: T::Balance, input_amount: T::Balance) -> T::Balance {
+    pub fn calculate_input_price (input_reserve: T::Balance, output_reserve: T::Balance, input_amount: T::Balance) -> T::Balance {
         // input_amount_with_fee: uint256 = input_amount * 997
         let input_amount_with_fee = input_amount * 997.saturated_into::<T::Balance>();
         // numerator: uint256 = input_amount_with_fee * output_reserve
@@ -151,12 +151,26 @@ impl<T: Trait> Module<T> {
         numenator / denominator
     }
 
-    fn get_output_price (input_reserve: T::Balance, output_reserve: T::Balance, output_amount: T::Balance) -> T::Balance {
+    pub fn calculate_output_price (input_reserve: T::Balance, output_reserve: T::Balance, output_amount: T::Balance) -> T::Balance {
         // numerator: uint256 = input_reserve * output_amount * 1000
         let numenator = input_reserve * output_amount * 1000.saturated_into::<T::Balance>();
         // denominator: uint256 = (output_reserve - output_amount) * 997
         let denominator = (output_reserve - output_amount) * 997.saturated_into::<T::Balance>();
         numenator / denominator + 1.saturated_into::<T::Balance>()
+    }
+
+    //Read-only function to be used by RPC
+    pub fn get_exchange_input_price(input_asset_id: T::AssetId, output_asset_id: T::AssetId, input_amount: T::Balance) -> T::Balance {
+        let pool = <Pools<T>>::get((input_asset_id, output_asset_id));
+        let output_amount = Self::calculate_input_price(pool.first_asset_amount, pool.second_asset_amount, input_amount);
+        output_amount
+    }
+
+    //Read-only function to be used by RPC
+    pub fn get_exchange_output_price(input_asset_id: T::AssetId, output_asset_id: T::AssetId, output_amount: T::Balance) -> T::Balance {
+        let pool = <Pools<T>>::get((input_asset_id, output_asset_id));
+        let input_amount = Self::calculate_output_price(pool.first_asset_amount, pool.second_asset_amount, output_amount);
+        input_amount
     }
 
 }
