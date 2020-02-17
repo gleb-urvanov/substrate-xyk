@@ -120,7 +120,6 @@ decl_module! {
                 let input_reserve = pool.first_asset_amount;
                 let output_reserve = pool.second_asset_amount;
 
-                ensure!(input_reserve > sold_asset_amount, "not enought reserve");
                 let bought_asset_amount = Self::calculate_input_price(input_reserve, output_reserve, sold_asset_amount);
                 ensure!(output_reserve > bought_asset_amount, "not enought reserve"); 
                 let mut new_pool = pool.clone();
@@ -140,7 +139,6 @@ decl_module! {
                 let input_reserve = pool.second_asset_amount;
                 let output_reserve = pool.first_asset_amount;
 
-                ensure!(input_reserve > sold_asset_amount, "not enought reserve");
                 let bought_asset_amount = Self::calculate_input_price(input_reserve, output_reserve, sold_asset_amount);
                 ensure!(output_reserve > bought_asset_amount, "not enought reserve"); 
                 let mut new_pool = pool.clone();
