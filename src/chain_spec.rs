@@ -1,7 +1,7 @@
 use sp_core::{Pair, Public, sr25519};
 use node_template_runtime::{
 	AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
-	SudoConfig, IndicesConfig, SystemConfig, WASM_BINARY, Signature
+	SudoConfig, IndicesConfig, SystemConfig, WASM_BINARY, Signature, GenericAssetConfig
 };
 use sp_consensus_aura::sr25519::{AuthorityId as AuraId};
 use grandpa_primitives::{AuthorityId as GrandpaId};
@@ -138,6 +138,17 @@ fn testnet_genesis(initial_authorities: Vec<(AuraId, GrandpaId)>,
 		}),
 		grandpa: Some(GrandpaConfig {
 			authorities: initial_authorities.iter().map(|x| (x.1.clone(), 1)).collect(),
+		}),
+		generic_asset: Some(GenericAssetConfig {
+			assets: vec![
+				13,
+				1,
+			],
+			initial_balance: 10u128.pow(18 + 9), // 1 billion token with 18 decimals
+			endowed_accounts: endowed_accounts.clone().into_iter().map(Into::into).collect(),
+			next_asset_id: 100,
+			staking_asset_id: 1,
+			spending_asset_id: 1,
 		}),
 	}
 }
