@@ -120,7 +120,7 @@ decl_module! {
         }
     
         // you will sell your token1_amount to get some token2_amount
-        fn buy_y_for_x (origin, token1_id: T::AssetId, token2_id: T::AssetId, token1_amount: T::Balance, amount: T::Balance) -> DispatchResult {
+        fn buy_y_for_x (origin, token1_id: T::AssetId, token2_id: T::AssetId, token1_amount: T::Balance) -> DispatchResult {
             let sender = ensure_signed(origin)?;
             let output_reserve: T::Balance;
             let input_reserve: T::Balance;
@@ -138,7 +138,7 @@ decl_module! {
                 output_reserve = (<Pools<T>>::get((token1_id, token2_id))).token2_amount;
                 ensure!(output_reserve > 0.saturated_into::<T::Balance>(), "not enought reserve"); 
                 ensure!(input_reserve > 0.saturated_into::<T::Balance>(), "not enought reserve");
-                let dy = Self::get_input_price(input_reserve, output_reserve, amount);
+                let dy = Self::get_input_price(input_reserve, output_reserve, token1_amount);
                 let mut new_pool = <Pools<T>>::get((token1_id, token2_id));
                 new_pool.token1_amount = input_reserve + token1_amount;
                 new_pool.token2_amount = output_reserve - dy;
