@@ -85,9 +85,18 @@ decl_module! {
 			// TODO ensure sender has enough assets
 
 			<generic_asset::Module<T>>::make_transfer_with_event(
-				&first_asset_id, &sender, &vault_address, first_asset_amount.clone())?;
+				&first_asset_id,
+				&sender,
+				&vault_address,
+				first_asset_amount.clone()
+			)?;
+
 			<generic_asset::Module<T>>::make_transfer_with_event(
-				&second_asset_id, &sender, &vault_address, second_asset_amount.clone())?;
+				&second_asset_id,
+				&sender,
+				&vault_address,
+				second_asset_amount.clone()
+			)?;
 
 			<Pools<T>>::insert((first_asset_id, second_asset_id), first_asset_amount.clone());
 			<Pools<T>>::insert((second_asset_id, first_asset_id), second_asset_amount.clone());
