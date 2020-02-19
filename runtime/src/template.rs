@@ -59,7 +59,7 @@ decl_event!(
 	pub enum Event<T> where AccountId = <T as system::Trait>::AccountId {
 		// Just a dummy event.
 		// Event `Something` is declared with a parameter of the type `u32` and `AccountId`
-		// To emit this event, we call the deposit funtion, from our runtime funtions
+		// To emit this event, we call the deposit function, from our runtime functions
 		SomethingStored(u32, AccountId),
 	}
 );
@@ -122,7 +122,7 @@ mod tests {
 	#[test]
 	fn it_works_for_default_value() {
 		new_test_ext().execute_with(|| {
-			// Just a dummy test for the dummy funtion `do_something`
+			// Just a dummy test for the dummy function `do_something`
 			// calling the `do_something` function with a value 42
 			assert_ok!(TemplateModule::do_something(Origin::signed(1), 42));
 			// asserting that the stored value is equal to what we stored
