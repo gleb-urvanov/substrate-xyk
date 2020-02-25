@@ -14,7 +14,7 @@ use system::ensure_signed;
 
 pub trait Trait: generic_asset::Trait {
     // TODO: Add other types and constants required configure this module.
-    //type Hashing = BlakeTwo256;
+    // type Hashing = BlakeTwo256;
 
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
@@ -69,15 +69,15 @@ decl_module! {
 
             let vault_address: T::AccountId  = <VaultId<T>>::get();
 
-            // ensure!(
-            //     !<Pools<T>>::exists(first_asset_id,second_asset_id),
-            //     "Pools already exists"
-            // );
+            ensure!(
+                !<Pools<T>>::contains_key((first_asset_id, second_asset_id)),
+                "Pools already exists"
+            );
 
-            // ensure!(
-            //     !<Pools<T>>::exists((second_asset_id,first_asset_id)),
-            //     "Sanity check has failed, the chain is in undefined state"
-            // );
+            ensure!(
+                !<Pools<T>>::contains_key((second_asset_id,first_asset_id)),
+                "Sanity check has failed, the chain is in undefined state"
+            );
 
             // TODO ensure sender has enough assets
 
@@ -112,7 +112,7 @@ decl_module! {
 
             // TODO ensure sender has enough assets
 
-            // ensure!(<Pools<T>>::exists((sold_asset_id,bought_asset_id)), "no such pool");
+            ensure!(<Pools<T>>::contains_key((sold_asset_id,bought_asset_id)), "no such pool");
 
             let input_reserve = <Pools<T>>::get((sold_asset_id, bought_asset_id));
             let output_reserve = <Pools<T>>::get((bought_asset_id, sold_asset_id));
