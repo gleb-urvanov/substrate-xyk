@@ -9,7 +9,7 @@ use frame_support::{
     decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure, StorageMap,
 };
 
-use generic_asset;
+use generic_asset::{AssetOptions, Owner, PermissionLatest};
 use system::ensure_signed;
 
 pub trait Trait: generic_asset::Trait {
@@ -75,7 +75,8 @@ decl_module! {
 
             let vault_address: T::AccountId  = <VaultId<T>>::get();
 
-//  TODO ensure assets exists ?
+            //  TODO ensure assets exists ?
+            //  TODO asset1 != asset2
 
             ensure!(
                 !<Pools<T>>::contains_key((first_asset_id, second_asset_id)),
@@ -126,17 +127,16 @@ decl_module! {
 
             let initial_liquidity = first_asset_amount * second_asset_amount; //for example, doesn't really matter
 
-            // let options = <generic_asset::Module<T>>::AssetOptions;
-            //   {
-            //      initial_issuance: initial_liquidity,
-            //      permissions: <generic_asset::Module<T>>::PermissionLatest<sender>,
-            //  }
-              <generic_asset::Module<T>>::create_asset(
-                None,
-                origin,
-                 <initial_liquidity, sender>,
-              );
+            let default_permission = generic_asset::PermissionLatest {
+                update: Owner::Address(sender.clone()),
+                mint: Owner::Address(sender.clone()),
+                burn: Owner::Address(sender.clone()),
+            };
 
+            <generic_asset::Module<T>>::create_asset(Some(liquidity_asset_id.clone()), Some(sender.clone()), generic_asset::AssetOptions {
+                initial_issuance: initial_liquidity.clone(),
+                permissions: default_permission,
+            })?;
 
             <TotalLiquidities<T>>::insert(
                 liquidity_asset_id.clone(), initial_liquidity.clone()
@@ -172,7 +172,7 @@ decl_module! {
             let input_reserve = <Pools<T>>::get((sold_asset_id, bought_asset_id));
             let output_reserve = <Pools<T>>::get((bought_asset_id, sold_asset_id));
 
-            let bought_asset_amount = Self::calculate_input_price(
+            let bought_asset_amount = Self::calculate_sell_price(
                 input_reserve, output_reserve,
                 sold_asset_amount,
             );
@@ -231,7 +231,7 @@ decl_module! {
             let input_reserve = <Pools<T>>::get((sold_asset_id, bought_asset_id));
             let output_reserve = <Pools<T>>::get((bought_asset_id, sold_asset_id));
 
-            let sold_asset_amount = Self::calculate_output_price(
+            let sold_asset_amount = Self::calculate_buy_price(
                 input_reserve,
                 output_reserve,
                 bought_asset_amount,
@@ -420,7 +420,7 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    pub fn calculate_input_price(
+    pub fn calculate_sell_price(
         input_reserve: T::Balance,
         output_reserve: T::Balance,
         input_amount: T::Balance,
@@ -435,7 +435,7 @@ impl<T: Trait> Module<T> {
         numerator / denominator
     }
 
-    pub fn calculate_output_price(
+    pub fn calculate_buy_price(
         input_reserve: T::Balance,
         output_reserve: T::Balance,
         output_amount: T::Balance,
@@ -458,6 +458,8 @@ impl<T: Trait> Module<T> {
             <LiquidityAssets<T>>::get((second_asset_id, first_asset_id))
         }
     }
+
+    
     // //Read-only function to be used by RPC
     // pub fn get_exchange_input_price(
     //     input_asset_id: T::AssetId,
