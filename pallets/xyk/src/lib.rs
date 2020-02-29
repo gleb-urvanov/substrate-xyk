@@ -133,7 +133,7 @@ decl_module! {
                 burn: Owner::Address(sender.clone()),
             };
 
-            <generic_asset::Module<T>>::create_asset(Some(liquidity_asset_id.clone()), Some(sender.clone()), generic_asset::AssetOptions {
+            <generic_asset::Module<T>>::create_asset(None, Some(sender.clone()), generic_asset::AssetOptions {
                 initial_issuance: initial_liquidity.clone(),
                 permissions: default_permission,
             })?;
@@ -173,7 +173,8 @@ decl_module! {
             let output_reserve = <Pools<T>>::get((bought_asset_id, sold_asset_id));
 
             let bought_asset_amount = Self::calculate_sell_price(
-                input_reserve, output_reserve,
+                input_reserve,
+                output_reserve,
                 sold_asset_amount,
             );
 
