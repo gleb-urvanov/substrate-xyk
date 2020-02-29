@@ -88,7 +88,6 @@ decl_module! {
             first_asset_id: T::AssetId,
             second_asset_id: T::AssetId
         ) -> DispatchResult {
-            // TO DO: create new vault
             ensure_signed(origin)?;
 
             ensure!(
@@ -101,6 +100,7 @@ decl_module! {
                 "Sanity check has failed, the chain is in undefined state"
             );
 
+            // TODO generate separate addresses for pool pairs
             let random_hash = Self::generate_random_hash();
 
             <PoolId<T>>::insert((first_asset_id, second_asset_id), random_hash);
@@ -122,7 +122,8 @@ decl_module! {
             first_asset_id: T::AssetId,
 			second_asset_id: T::AssetId,
 			first_asset_amount: T::Balance,
-			second_asset_amount: T::Balance
+            second_asset_amount: T::Balance
+            // TODO dispatch result ?
 		) {
             let from_account = ensure_signed(origin)?;
 
@@ -134,8 +135,9 @@ decl_module! {
             // TODO ensure sender has enough assets
 
 			let pool_id = Self::get_pool_id((first_asset_id, second_asset_id));
-			let total_liquidity = Self::get_pool_liquidity(&pool_id);
-			let vault_address = <VaultId<T>>::get();
+            let total_liquidity = Self::get_pool_liquidity(&pool_id);
+            // TODO generate separate addresses for pool pairs
+            let vault_address = <VaultId<T>>::get();
 
             // Check if pool is empty
 			if total_liquidity.is_zero() {
@@ -149,8 +151,8 @@ decl_module! {
 				<ProviderLiquidityBalance<T>>::insert(&pool_id, &from_account, initial_liquidity);
                 <PoolLiquidity<T>>::insert(&pool_id, initial_liquidity);
 
+                // TODO Call deposit event
 
-				// TODO Call deposit event
 			} else {
                 let first_asset_reserve = <PoolBalance<T>>::get((first_asset_id, second_asset_id));
                 let second_asset_reserve = <PoolBalance<T>>::get((second_asset_id, first_asset_id));
@@ -165,16 +167,100 @@ decl_module! {
 				<generic_asset::Module<T>>::make_transfer(&first_asset_id, &from_account, &vault_address, first_asset_amount)?;
                 <generic_asset::Module<T>>::make_transfer(&second_asset_id, &from_account, &vault_address, second_asset_required)?;
 
+                // TODO overflow check
 				<ProviderLiquidityBalance<T>>::insert(
                     &pool_id, &from_account,
                     Self::get_provider_liquidity_balance(&pool_id, &from_account) + liquidity_minted
                 );
 
-                // TODO: overflow check or use asset constrained by max supply
+                // TODO overflow check or use asset constrained by max supply
 				<PoolLiquidity<T>>::mutate(pool_id, |balance| *balance += liquidity_minted);
 
-                // TODO: Emit event
-			}
+                // TODO Emit event
+            }
+        }
+
+        /// Burn exchange assets to withdraw Asset 1 and Asset 2 at current rate
+		///
+		/// `origin`
+		/// `first_asset_id`
+		/// `second_asset_id`
+		/// `liquidity_withdrawn`
+		/// `minimum first_asset_amount`
+		/// `minimum second_asset_amount`
+		pub fn remove_liquidity(
+			origin,
+			first_asset_id: T::AssetId,
+            second_asset_id: T::AssetId,
+            liquidity_withdrawn: T::Balance,
+			first_asset_withdraw: T::Balance,
+            second_asset_withdraw: T::Balance
+            // TODO dispatch result ?
+		) {
+            let from_account = ensure_signed(origin)?;
+
+			ensure!(
+				liquidity_withdrawn > Zero::zero(),
+				"Cannot withdraw zero liquidity"
+            );
+
+            // TODO make zero or Null withdraw without limit?
+			ensure!(
+				first_asset_withdraw > Zero::zero() && second_asset_withdraw > Zero::zero(),
+				"Minimum amount cannot be zero"
+			);
+
+            let pool_id = Self::get_pool_id((first_asset_id, second_asset_id));
+            let total_liquidity = Self::get_pool_liquidity(&pool_id);
+
+			ensure!(
+				total_liquidity > Zero::zero(),
+				"Pool has no liquidity"
+            );
+            ensure!(
+				total_liquidity >= liquidity_withdrawn,
+				"Not enough liquidity in pool"
+			);
+
+            let account_liquidity = Self::get_provider_liquidity_balance(pool_id, &from_account);
+
+			ensure!(
+				account_liquidity >= liquidity_withdrawn,
+				"Not enough liquidity owned"
+			);
+
+            // TODO generate separate addresses for pool pairs
+            let vault_address = <VaultId<T>>::get();
+
+            let first_asset_reserve = <PoolBalance<T>>::get((first_asset_id, second_asset_id));
+            let second_asset_reserve = <PoolBalance<T>>::get((second_asset_id, first_asset_id));
+
+			let first_asset_required = liquidity_withdrawn * first_asset_reserve / total_liquidity;
+			let second_asset_required = liquidity_withdrawn * second_asset_reserve / total_liquidity;
+
+            // TODO add asset id or asset ticker
+            ensure!(
+                first_asset_required >= first_asset_withdraw,
+				"Cannot fullfil minimum asset amount requirement"
+			);
+            ensure!(
+                second_asset_required >= second_asset_required,
+				"Cannot fullfil minimum asset amount requirement"
+			);
+
+            <generic_asset::Module<T>>::make_transfer(&first_asset_id, &vault_address, &from_account, first_asset_required)?;
+            <generic_asset::Module<T>>::make_transfer(&second_asset_id, &vault_address, &from_account, second_asset_required)?;
+
+            // TODO underflow check
+            <ProviderLiquidityBalance<T>>::insert(
+                &pool_id, &from_account,
+                Self::get_provider_liquidity_balance(&pool_id, &from_account) - liquidity_withdrawn
+            );
+
+            // TODO underflow check or use asset constrained by max supply
+            <PoolLiquidity<T>>::mutate(pool_id, |balance| *balance -= liquidity_withdrawn);
+
+			// TODO Deposit event
 		}
 
         /// you will sell your sold_asset_amount of sold_asset_id to get some amount of bought_asset_id
