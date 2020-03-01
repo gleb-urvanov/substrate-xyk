@@ -12,6 +12,12 @@ use frame_support::{
 use generic_asset::{AssetOptions, Owner, PermissionLatest};
 use system::ensure_signed;
 
+#[cfg(test)]
+mod mock;
+
+#[cfg(test)]
+mod tests;
+
 pub trait Trait: generic_asset::Trait {
     // TODO: Add other types and constants required configure this module.
     // type Hashing = BlakeTwo256;
@@ -36,7 +42,7 @@ decl_event!(
 decl_storage! {
     trait Store for Module<T: Trait> as XykStorage {
         // alicethepool wonderland
-        VaultId: T::AccountId;
+        VaultId get(vault_id): T::AccountId;
 
         Pools get(asset_pool): map hasher(blake2_256) (T::AssetId, T::AssetId) => T::Balance;
 
