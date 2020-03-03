@@ -4,9 +4,9 @@
 /// https://github.com/paritytech/substrate/blob/master/frame/example/src/lib.rs
 // TODO documentation!
 use sp_runtime::traits::SaturatedConversion;
-
+use codec::{Decode, Encode, HasCompact, Input, Output, Error as CodecError};
 use frame_support::{
-    decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure, StorageMap,
+    decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, ensure, StorageMap,
 };
 
 use generic_asset::{AssetOptions, Owner, PermissionLatest};
@@ -24,6 +24,38 @@ pub trait Trait: generic_asset::Trait {
 
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
+}
+
+decl_error! {
+	/// Error for the generic-asset module.
+	pub enum Error for Module<T: Trait> {
+		/// No new assets id available.
+		NoIdAvailable,
+		/// Cannot transfer zero amount.
+		ZeroAmount,
+		/// The origin does not have enough permission to update permissions.
+		NoUpdatePermission,
+		/// The origin does not have permission to mint an asset.
+		NoMintPermission,
+		/// The origin does not have permission to burn an asset.
+		NoBurnPermission,
+		/// Total issuance got overflowed after minting.
+		TotalMintingOverflow,
+		/// Free balance got overflowed after minting.
+		FreeMintingOverflow,
+		/// Total issuance got underflowed after burning.
+		TotalBurningUnderflow,
+		/// Free balance got underflowed after burning.
+		FreeBurningUnderflow,
+		/// Asset id is already taken.
+		IdAlreadyTaken,
+		/// Asset id not available.
+		IdUnavailable,
+		/// The balance is too low to send amount.
+		InsufficientBalance,
+		/// The account liquidity restrictions prevent withdrawal.
+		LiquidityRestrictions,
+	}
 }
 
 decl_event!(

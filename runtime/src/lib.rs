@@ -8,6 +8,7 @@
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
+use codec::{Decode, Encode, HasCompact, Input, Output, Error as CodecError};
 use generic_asset;
 use grandpa::fg_primitives;
 use grandpa::AuthorityList as GrandpaAuthorityList;

@@ -17,10 +17,16 @@ fn set_vault_works() {
 fn set_vault_not_work_if_already_initiated() {
 	new_test_ext().execute_with(|| {
 		XykStorage::set_vault_id(Origin::signed(1));
-		assert_ok!(XykStorage::set_vault_id(Origin::signed(1)));
-        assert_eq!(XykStorage::vault_id(), 1);
+
+		assert_noop!(XykStorage::set_vault_id(Origin::signed(1)),
+			Error::<Test>::NoIdAvailable
+		);
+	   
+
 	});
 }
+
+
 
 //sell working assert (values as vault, values at vallet, values at maps)
 //sell not working if not enough asset to sell
