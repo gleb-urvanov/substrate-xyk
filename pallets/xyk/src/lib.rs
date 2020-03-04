@@ -163,8 +163,10 @@ decl_module! {
                 (first_asset_id, second_asset_id), liquidity_asset_id.clone()
             );
 
-            let initial_liquidity = first_asset_amount * second_asset_amount; //for example, doesn't really matter
+           // let initial_liquidity = first_asset_amount * second_asset_amount; //for example, doesn't really matter
+           let initial_liquidity = 1000.saturated_into::<T::Balance>();
 
+            //permissions_none ?
             let default_permission = generic_asset::PermissionLatest {
                 update: Owner::Address(sender.clone()),
                 mint: Owner::Address(sender.clone()),
@@ -172,7 +174,8 @@ decl_module! {
             };
 
             <generic_asset::Module<T>>::create_asset(None, Some(sender.clone()), generic_asset::AssetOptions {
-                initial_issuance: initial_liquidity.clone(),
+               // initial_issuance: initial_liquidity.clone(),
+                initial_issuance: 1000.saturated_into::<T::Balance>(),
                 permissions: default_permission,
             })?;
 
@@ -180,13 +183,7 @@ decl_module! {
                 liquidity_asset_id.clone(), initial_liquidity.clone()
             );
 
-            //TODO mint_free of liqudity_pool_id asset to sender in an amount of initial_liquidity
-            <generic_asset::Module<T>>::mint_free(
-                &liquidity_asset_id,
-                &sender,
-                &sender,
-                &initial_liquidity,
-            )?;
+   
 
             Ok(())
         }
@@ -378,13 +375,13 @@ decl_module! {
                 second_asset_reserve + second_asset_amount,
             );
 
-            let new_total_liquidity = <TotalLiquidities<T>>::get(liquidity_asset_id) + liquidity_assets_minted;
+            let new_total_liquidity = <TotalLiquidities<T>>::get(liquidity_asset_id) + liquidity_assets_minted.clone();
             <TotalLiquidities<T>>::insert(liquidity_asset_id.clone(), new_total_liquidity.clone());
 
             //TODO mint_free of liqudity_pool_id asset to sender in an amount of += liquidity_assets_minted
             <generic_asset::Module<T>>::mint_free(
                  &liquidity_asset_id,
-                 &sender,
+                 &vault,
                  &sender,
                  &liquidity_assets_minted,
             )?;
