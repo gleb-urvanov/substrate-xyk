@@ -163,8 +163,8 @@ decl_module! {
                 (first_asset_id, second_asset_id), liquidity_asset_id.clone()
             );
 
-           // let initial_liquidity = first_asset_amount * second_asset_amount; //for example, doesn't really matter
-           let initial_liquidity = 1000.saturated_into::<T::Balance>();
+            let initial_liquidity = first_asset_amount * second_asset_amount; //for example, doesn't really matter
+        //   let initial_liquidity = 1000.saturated_into::<T::Balance>();
 
             //permissions_none ?
             let default_permission = generic_asset::PermissionLatest {
@@ -174,8 +174,8 @@ decl_module! {
             };
 
             <generic_asset::Module<T>>::create_asset(None, Some(sender.clone()), generic_asset::AssetOptions {
-               // initial_issuance: initial_liquidity.clone(),
-                initial_issuance: 1000.saturated_into::<T::Balance>(),
+                initial_issuance: initial_liquidity.clone(),
+             //   initial_issuance: 1000.saturated_into::<T::Balance>(),
                 permissions: default_permission,
             })?;
 
