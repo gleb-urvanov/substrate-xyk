@@ -12,6 +12,7 @@ use frame_support::{
 use generic_asset::{AssetOptions, Owner, PermissionLatest};
 use system::ensure_signed;
 
+
 #[cfg(test)]
 mod mock;
 
@@ -163,21 +164,22 @@ decl_module! {
                 (first_asset_id, second_asset_id), liquidity_asset_id.clone()
             );
 
-            let initial_liquidity = first_asset_amount * second_asset_amount; //for example, doesn't really matter
+            let initial_liquidity = first_asset_amount + second_asset_amount; //for example, doesn't really matter
         //   let initial_liquidity = 1000.saturated_into::<T::Balance>();
 
+            Self::create_asset_to(origin.clone(), initial_liquidity);
             //permissions_none ?
-            let default_permission = generic_asset::PermissionLatest {
-                update: Owner::Address(sender.clone()),
-                mint: Owner::Address(sender.clone()),
-                burn: Owner::Address(sender.clone()),
-            };
+            // let default_permission = generic_asset::PermissionLatest {
+            //     update: Owner::Address(vault_address.clone()),
+            //     mint: Owner::Address(vault_address.clone()),
+            //     burn: Owner::Address(vault_address.clone()),
+            // };
 
-            <generic_asset::Module<T>>::create_asset(None, Some(sender.clone()), generic_asset::AssetOptions {
-                initial_issuance: initial_liquidity.clone(),
-             //   initial_issuance: 1000.saturated_into::<T::Balance>(),
-                permissions: default_permission,
-            })?;
+            // <generic_asset::Module<T>>::create_asset(None, Some(sender.clone()), generic_asset::AssetOptions {
+            //     initial_issuance: initial_liquidity.clone(),
+            //  //   initial_issuance: 1000.saturated_into::<T::Balance>(),
+            //     permissions: default_permission,
+            // })?;
 
             <TotalLiquidities<T>>::insert(
                 liquidity_asset_id.clone(), initial_liquidity.clone()
@@ -322,23 +324,25 @@ decl_module! {
 
             //get liquidity_asset_id of selected pool
             let liquidity_asset_id = Self::get_liquidity_asset(
-                first_asset_id,
-                second_asset_id
+                 first_asset_id,
+                 second_asset_id
             );
+
+           // let liquidity_asset_id = <LiquidityAssets<T>>::get((first_asset_id, second_asset_id));
 
             ensure!(
                 <Pools<T>>::contains_key((first_asset_id,second_asset_id)),
                 "no such pool"
             );
 
-            ensure!(
-                <TotalLiquidities<T>>::get(liquidity_asset_id.clone()) > 0.saturated_into(),
-                "pool has no liquidity"
-            );
+            // ensure!(
+            //     <TotalLiquidities<T>>::get(liquidity_asset_id.clone()) > 0.saturated_into(),
+            //     "pool has no liquidity"
+            // );
 
             let first_asset_reserve = <Pools<T>>::get((first_asset_id, second_asset_id));
             let second_asset_reserve = <Pools<T>>::get((second_asset_id, first_asset_id));
-            let second_asset_amount = first_asset_amount * second_asset_reserve / first_asset_reserve + 1.saturated_into();
+            let second_asset_amount = first_asset_amount * second_asset_reserve / first_asset_reserve + 1.saturated_into::<T::Balance>();
             let total_liquidity_assets = <TotalLiquidities<T>>::get(liquidity_asset_id);
             let liquidity_assets_minted = first_asset_amount * total_liquidity_assets / first_asset_reserve;
 
@@ -445,7 +449,7 @@ decl_module! {
             //TODO burn_free of liqudity_pool_id asset to sender in an amount of += liquidity_assets_minted
             <generic_asset::Module<T>>::burn_free(
                 &liquidity_asset_id,
-                &sender,
+                &vault,
                 &sender,
                 &liquidity_asset_amount,
             )?;
@@ -487,15 +491,43 @@ impl<T: Trait> Module<T> {
         first_asset_id: T::AssetId,
         second_asset_id: T::AssetId
     ) -> T::AssetId {
-        if <LiquidityAssets<T>>::contains_key((second_asset_id,first_asset_id)){
-            <LiquidityAssets<T>>::get((first_asset_id, second_asset_id))
+        if <LiquidityAssets<T>>::contains_key((first_asset_id, second_asset_id)){
+            return <LiquidityAssets<T>>::get((first_asset_id, second_asset_id))
         }
         else{
-            <LiquidityAssets<T>>::get((second_asset_id, first_asset_id))
+            return <LiquidityAssets<T>>::get((second_asset_id, first_asset_id))
         }
     }
 
+    fn create_asset_to(
+        origin: T::Origin,
+        amount: T::Balance,      
+    ) -> DispatchResult {
+        
+        let vault: T::AccountId  = <VaultId<T>>::get();
+        let sender = ensure_signed(origin)?;
+        
+		let default_permission = generic_asset::PermissionLatest {
+			update: Owner::Address(vault.clone()),
+			mint: Owner::Address(vault.clone()),
+			burn: Owner::Address(vault.clone()),
+		};
+
+		<generic_asset::Module<T>>::create_asset(None, Some(sender.clone()), generic_asset::AssetOptions {
+			initial_issuance: amount,
+		 	permissions: default_permission,
+		})?;
     
+        Ok(())
+    }
+
+    fn get_free_balance(
+        assetId: T::AssetId,
+        from: T::AccountId,       
+    ) -> T::Balance {
+       return <generic_asset::Module<T>>::free_balance(&assetId, &from)
+    }
+
     // //Read-only function to be used by RPC
     // pub fn get_exchange_input_price(
     //     input_asset_id: T::AssetId,
