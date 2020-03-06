@@ -78,7 +78,7 @@ decl_storage! {
         VaultId get(vault_id): T::AccountId;
 
         Pools get(asset_pool): map hasher(blake2_256) (T::AssetId, T::AssetId) => T::Balance;
-
+       
         LiquidityAssets get(liquidity_pool): map hasher(blake2_256) (T::AssetId, T::AssetId) => T::AssetId;
 
         TotalLiquidities get(totalliquidity): map hasher(blake2_256) T::AssetId => T::Balance;
@@ -137,20 +137,6 @@ decl_module! {
                 "not enough second asset"
             );
             
-            <generic_asset::Module<T>>::make_transfer_with_event(
-                &first_asset_id,
-                &sender,
-                &vault_address,
-                first_asset_amount.clone()
-            )?;
-
-            <generic_asset::Module<T>>::make_transfer_with_event(
-                &second_asset_id,
-                &sender,
-                &vault_address,
-                second_asset_amount.clone()
-            )?;
-
             <Pools<T>>::insert(
                 (first_asset_id, second_asset_id), first_asset_amount.clone()
             );
@@ -165,27 +151,34 @@ decl_module! {
             );
 
             let initial_liquidity = first_asset_amount + second_asset_amount; //for example, doesn't really matter
-        //   let initial_liquidity = 1000.saturated_into::<T::Balance>();
-
+       
             Self::create_asset_to(origin.clone(), initial_liquidity);
-            //permissions_none ?
-            // let default_permission = generic_asset::PermissionLatest {
-            //     update: Owner::Address(vault_address.clone()),
-            //     mint: Owner::Address(vault_address.clone()),
-            //     burn: Owner::Address(vault_address.clone()),
-            // };
-
-            // <generic_asset::Module<T>>::create_asset(None, Some(sender.clone()), generic_asset::AssetOptions {
-            //     initial_issuance: initial_liquidity.clone(),
-            //  //   initial_issuance: 1000.saturated_into::<T::Balance>(),
-            //     permissions: default_permission,
-            // })?;
-
+           
             <TotalLiquidities<T>>::insert(
                 liquidity_asset_id.clone(), initial_liquidity.clone()
             );
 
-   
+
+            <generic_asset::Module<T>>::make_transfer_with_event(
+                &first_asset_id,
+                &sender,
+                &vault_address,
+                first_asset_amount.clone()
+            )?;
+
+            <generic_asset::Module<T>>::make_transfer_with_event(
+                &second_asset_id,
+                &sender,
+                &vault_address,
+                second_asset_amount.clone()
+            )?;
+
+       
+
+           
+            
+
+
 
             Ok(())
         }
@@ -413,8 +406,8 @@ decl_module! {
 
             let first_asset_reserve = <Pools<T>>::get((first_asset_id, second_asset_id));
             let second_asset_reserve = <Pools<T>>::get((second_asset_id, first_asset_id));
-            let first_asset_amount = first_asset_reserve * <generic_asset::Module<T>>::free_balance(&liquidity_asset_id, &sender) / <TotalLiquidities<T>>::get(liquidity_asset_id);
-            let second_asset_amount = second_asset_reserve * <generic_asset::Module<T>>::free_balance(&liquidity_asset_id, &sender) / <TotalLiquidities<T>>::get(liquidity_asset_id);
+            let first_asset_amount = first_asset_reserve * liquidity_asset_amount / <TotalLiquidities<T>>::get(liquidity_asset_id);
+            let second_asset_amount = second_asset_reserve * liquidity_asset_amount / <TotalLiquidities<T>>::get(liquidity_asset_id);
 
             <generic_asset::Module<T>>::make_transfer_with_event(
                 &first_asset_id,
@@ -527,7 +520,7 @@ impl<T: Trait> Module<T> {
     ) -> T::Balance {
        return <generic_asset::Module<T>>::free_balance(&assetId, &from)
     }
-
+  
     // //Read-only function to be used by RPC
     // pub fn get_exchange_input_price(
     //     input_asset_id: T::AssetId,

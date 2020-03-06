@@ -16,7 +16,7 @@ pub trait Trait: generic_asset::Trait {
     // TODO: Add other types and constants required configure this module.
     // type Hashing = BlakeTwo256;
 
-    /// The overarching event type.
+    // The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
 //set_vault working, id set
@@ -28,40 +28,205 @@ fn set_vault_works() {
 	});
 }
 
-
+//create_pool working assert (right values in maps and accounts)
 #[test]
-fn testt() {
+fn create_pool_working() {
 	new_test_ext().execute_with(|| {
 		
+		// setting vault to accountId 1
 		XykStorage::set_vault_id(Origin::signed(1));
-			XykStorage::create_asset_to(
-		 	Origin::signed(2),
-			1000,
-		);
+		// creating asset with assetId 0 and minting to accountId 2
 		XykStorage::create_asset_to(
 		 	Origin::signed(2),
 			1000,
 		);
-
-		let amount: T::Balance = 500;
-		
-
-
-
+		// creating asset with assetId 1 and minting to accountId 2
+		XykStorage::create_asset_to(
+		 	Origin::signed(2),
+			1000,
+		);
+		// creating pool by assetId 2
 		XykStorage::create_pool(
-			Origin::signed(1),
-			accid1,
+			Origin::signed(2),
+			0,
 			500,
-			//500.saturated_into::<T::Balance>(),
-			101,
+			1,
 			500,
 		);
-		assert_eq!(XykStorage::vault_id(), 1);
-		assert_eq!(XykStorage::asset_pool((100,101)), 500);
-		assert_eq!(XykStorage::liquidity_pool((100,101)), 102);
-		assert_eq!(XykStorage::totalliquidity(102), 1000);
 
-	//	assert_eq!(XykStorage::get_free_balance(102,2), 1000);
+		assert_eq!(XykStorage::asset_pool((0, 1)), 500); // amount in pool map
+		assert_eq!(XykStorage::asset_pool((1, 0)), 500); // amount in pool map
+		assert_eq!(XykStorage::liquidity_pool((0, 1)), 2); // liquidity assetId corresponding to newly created pool
+		assert_eq!(XykStorage::totalliquidity(2), 1000); // total liquidity assets
+		assert_eq!(XykStorage::get_free_balance(2, 2), 1000); // amount of liquidity assets owned by user by creating pool / initial minting (500+500)
+		assert_eq!(XykStorage::get_free_balance(0, 2), 500); // amount in user acc after creating pool / initial minting 
+		assert_eq!(XykStorage::get_free_balance(1, 2), 500); // amount in user acc after creating pool / initial minting 
+		assert_eq!(XykStorage::get_free_balance(0, 1), 500); // amount in vault acc
+		assert_eq!(XykStorage::get_free_balance(1, 1), 500); // amount in vault acc
+	});
+}
+
+#[test]
+fn mint_working() {
+	new_test_ext().execute_with(|| {
+		
+		// setting vault to accountId 1
+		XykStorage::set_vault_id(Origin::signed(1));
+		// creating asset with assetId 0 and minting to accountId 2
+		XykStorage::create_asset_to(
+		 	Origin::signed(2),
+			1000,
+		);
+		// creating asset with assetId 1 and minting to accountId 2
+		XykStorage::create_asset_to(
+		 	Origin::signed(2),
+			1000,
+		);
+		// creating pool by assetId 2
+		XykStorage::create_pool(
+			Origin::signed(2),
+			0,
+			500,
+			1,
+			500,
+		);
+		// minting pool 0 1 with 250 assetId 0
+		XykStorage::mint_liquidity(
+			Origin::signed(2),
+			0,
+			1,
+			250,
+		);
+
+		assert_eq!(XykStorage::totalliquidity(2), 1500); // total liquidity assets
+		assert_eq!(XykStorage::get_free_balance(2,2), 1500); // amount of liquidity assets owned by user by creating pool and minting
+		assert_eq!(XykStorage::get_free_balance(0,2), 250); // amount in user acc after minting 
+		assert_eq!(XykStorage::get_free_balance(1,2), 249); // amount in user acc after minting 
+		assert_eq!(XykStorage::get_free_balance(0,1), 750); // amount in vault acc
+		assert_eq!(XykStorage::get_free_balance(1,1), 751); // amount in vault acc
+	});
+}
+
+#[test]
+fn burn_working() {
+	new_test_ext().execute_with(|| {
+		
+		// setting vault to accountId 1
+		XykStorage::set_vault_id(Origin::signed(1));
+		// creating asset with assetId 0 and minting to accountId 2
+		XykStorage::create_asset_to(
+		 	Origin::signed(2),
+			1000,
+		);
+		// creating asset with assetId 1 and minting to accountId 2
+		XykStorage::create_asset_to(
+		 	Origin::signed(2),
+			1000,
+		);
+		// creating pool by assetId 2
+		XykStorage::create_pool(
+			Origin::signed(2),
+			0,
+			500,
+			1,
+			500,
+		);
+		// burning 250 liquidity assetId2 of pool 0 1
+		XykStorage::burn_liquidity(
+			Origin::signed(2),
+			0,
+			1,
+			500,
+		);
+
+		assert_eq!(XykStorage::totalliquidity(2), 500); // total liquidity assets
+		assert_eq!(XykStorage::get_free_balance(2,2), 500); // amount of liquidity assets owned by user by creating pool and burning
+		assert_eq!(XykStorage::get_free_balance(0,2), 750); // amount in user acc after burning 
+		assert_eq!(XykStorage::get_free_balance(1,2), 750); // amount in user acc after burning 
+		assert_eq!(XykStorage::get_free_balance(0,1), 250); // amount in vault acc
+		assert_eq!(XykStorage::get_free_balance(1,1), 250); // amount in vault acc
+	});
+}
+
+#[test]
+fn sell_working() {
+	new_test_ext().execute_with(|| {
+		
+		// setting vault to accountId 1
+		XykStorage::set_vault_id(Origin::signed(1));
+		// creating asset with assetId 0 and minting to accountId 2
+		XykStorage::create_asset_to(
+		 	Origin::signed(2),
+			1000000,
+		);
+		// creating asset with assetId 1 and minting to accountId 2
+		XykStorage::create_asset_to(
+		 	Origin::signed(2),
+			1000000,
+		);
+		// creating pool by assetId 2
+		XykStorage::create_pool(
+			Origin::signed(2),
+			0,
+			500000,
+			1,
+			500000,
+		);
+		// burning 250 liquidity assetId2 of pool 0 1
+		XykStorage::sell_asset(
+			Origin::signed(2),
+			0,
+			1,
+			250000,
+		);
+
+		assert_eq!(XykStorage::totalliquidity(2), 1000000); // total liquidity assets
+		assert_eq!(XykStorage::get_free_balance(2,2), 1000000); // amount of liquidity assets owned by user by creating pool and initial minting
+		assert_eq!(XykStorage::get_free_balance(0,2), 250000); // amount in user acc after selling 
+		assert_eq!(XykStorage::get_free_balance(1,2), 666332); // amount in user acc after buying (check rounding should be 666333?)
+		assert_eq!(XykStorage::get_free_balance(0,1), 750000); // amount in vault acc
+		assert_eq!(XykStorage::get_free_balance(1,1), 333668); // amount in vault acc (check rounding should be 666337?)
+	});
+}
+
+#[test]
+fn buy_working() {
+	new_test_ext().execute_with(|| {
+		
+		// setting vault to accountId 1
+		XykStorage::set_vault_id(Origin::signed(1));
+		// creating asset with assetId 0 and minting to accountId 2
+		XykStorage::create_asset_to(
+		 	Origin::signed(2),
+			1000000,
+		);
+		// creating asset with assetId 1 and minting to accountId 2
+		XykStorage::create_asset_to(
+		 	Origin::signed(2),
+			1000000,
+		);
+		// creating pool by assetId 2
+		XykStorage::create_pool(
+			Origin::signed(2),
+			0,
+			500000,
+			1,
+			500000,
+		);
+		// burning 250 liquidity assetId2 of pool 0 1
+		XykStorage::buy_asset(
+			Origin::signed(2),
+			0,
+			1,
+			150000,
+		);
+
+		assert_eq!(XykStorage::totalliquidity(2), 1000000); // total liquidity assets
+		assert_eq!(XykStorage::get_free_balance(2,2), 1000000); // amount of liquidity assets owned by user by creating pool and initial minting
+		assert_eq!(XykStorage::get_free_balance(0,2), 285069); // amount in user acc after selling (check rounding)
+		assert_eq!(XykStorage::get_free_balance(1,2), 650000); // amount in user acc after buying (check rounding )
+		assert_eq!(XykStorage::get_free_balance(0,1), 714931); // amount in vault acc (check rounding)
+		assert_eq!(XykStorage::get_free_balance(1,1), 350000); // amount in vault acc (check rounding)
 	});
 }
 
@@ -76,7 +241,7 @@ fn testt() {
 //buy not working if not enough liquidity in pool
 //buy not working if pool does not exist
 
-//create_pool working assert (if exists in maps, has right hash/accId)
+//create_pool working assert (right values in maps and accounts)
 //create_pool not working if no such assets
 //create_pool not working if pool already exists
 //create_pool not working if pool already exists other way around (create pool X-Y, but pool Y-X exists)
