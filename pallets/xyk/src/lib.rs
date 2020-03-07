@@ -28,34 +28,14 @@ pub trait Trait: generic_asset::Trait {
 }
 
 decl_error! {
-	/// Error for the generic-asset module.
+    /// Error for the generic-asset module.
+    
 	pub enum Error for Module<T: Trait> {
-		/// No new assets id available.
-		NoIdAvailable,
-		/// Cannot transfer zero amount.
-		ZeroAmount,
-		/// The origin does not have enough permission to update permissions.
-		NoUpdatePermission,
-		/// The origin does not have permission to mint an asset.
-		NoMintPermission,
-		/// The origin does not have permission to burn an asset.
-		NoBurnPermission,
-		/// Total issuance got overflowed after minting.
-		TotalMintingOverflow,
-		/// Free balance got overflowed after minting.
-		FreeMintingOverflow,
-		/// Total issuance got underflowed after burning.
-		TotalBurningUnderflow,
-		/// Free balance got underflowed after burning.
-		FreeBurningUnderflow,
-		/// Asset id is already taken.
-		IdAlreadyTaken,
-		/// Asset id not available.
-		IdUnavailable,
-		/// The balance is too low to send amount.
-		InsufficientBalance,
-		/// The account liquidity restrictions prevent withdrawal.
-		LiquidityRestrictions,
+        VaultAlreadySet,
+        PoolAlreadyExists,
+        NotEnoughAssets,
+        NoSuchPool,
+        NotEnoughReserve,
 	}
 }
 
@@ -82,6 +62,10 @@ decl_storage! {
         LiquidityAssets get(liquidity_pool): map hasher(blake2_256) (T::AssetId, T::AssetId) => T::AssetId;
 
         TotalLiquidities get(totalliquidity): map hasher(blake2_256) T::AssetId => T::Balance;
+
+        //feature needed just these 2
+        //TotalLiquidities get(totalliquidity): map hasher(blake2_256) T::AssetId => T::Balance;
+        //Vaults get(vault): map hasher(blake2_256) AssetId => T::AccountId;
     }
 }
 
@@ -95,7 +79,7 @@ decl_module! {
             let sender = ensure_signed(origin)?;
             ensure!(
                 !<VaultId<T>>::exists(),
-                "vault already initialized"
+                Error::<T>::VaultAlreadySet,
             );
             <VaultId<T>>::put(sender);
 
@@ -119,22 +103,22 @@ decl_module! {
 
             ensure!(
                 !<Pools<T>>::contains_key((first_asset_id, second_asset_id)),
-                "Pools already contains_key"
+                Error::<T>::PoolAlreadyExists,
             );
 
             ensure!(
                 !<Pools<T>>::contains_key((second_asset_id,first_asset_id)),
-                "Sanity check has failed, the chain is in undefined state"
+                Error::<T>::PoolAlreadyExists,
             );
 
             ensure!(
                 <generic_asset::Module<T>>::free_balance(&first_asset_id, &sender) >= first_asset_amount,
-                "not enough first asset"
+                Error::<T>::NotEnoughAssets,
             );
 
             ensure!(
                 <generic_asset::Module<T>>::free_balance(&second_asset_id, &sender) >= second_asset_amount,
-                "not enough second asset"
+                Error::<T>::NotEnoughAssets,
             );
             
             <Pools<T>>::insert(
@@ -173,13 +157,6 @@ decl_module! {
                 second_asset_amount.clone()
             )?;
 
-       
-
-           
-            
-
-
-
             Ok(())
         }
 
@@ -193,10 +170,10 @@ decl_module! {
             let sender = ensure_signed(origin)?;
 
             // TODO ensure sender has enough assets
-
+           
             ensure!(
                 <Pools<T>>::contains_key((sold_asset_id,bought_asset_id)),
-                 "no such pool"
+                Error::<T>::NoSuchPool,
             );
 
             let input_reserve = <Pools<T>>::get((sold_asset_id, bought_asset_id));
@@ -209,13 +186,8 @@ decl_module! {
             );
 
             ensure!(
-                output_reserve > bought_asset_amount,
-                "not enough reserve"
-            );
-
-            ensure!(
                 <generic_asset::Module<T>>::free_balance(&sold_asset_id, &sender) >= sold_asset_amount,
-                "not enough asset to sell"
+                Error::<T>::NotEnoughAssets,
             );
 
             let vault = <VaultId<T>>::get();
@@ -256,11 +228,16 @@ decl_module! {
 
             ensure!(
                 <Pools<T>>::contains_key((sold_asset_id,bought_asset_id)),
-                "no such pool"
+                Error::<T>::NoSuchPool,
             );
 
             let input_reserve = <Pools<T>>::get((sold_asset_id, bought_asset_id));
             let output_reserve = <Pools<T>>::get((bought_asset_id, sold_asset_id));
+
+            ensure!(
+                output_reserve > bought_asset_amount,
+                Error::<T>::NotEnoughReserve,
+            );
 
             let sold_asset_amount = Self::calculate_buy_price(
                 input_reserve,
@@ -269,13 +246,8 @@ decl_module! {
             );
 
             ensure!(
-                output_reserve > bought_asset_amount,
-                "not enough reserve"
-            );
-            
-            ensure!(
                 <generic_asset::Module<T>>::free_balance(&sold_asset_id, &sender) >= sold_asset_amount,
-                "not enough asset"
+                Error::<T>::NotEnoughAssets,
             );
 
             let vault = <VaultId<T>>::get();
@@ -321,11 +293,9 @@ decl_module! {
                  second_asset_id
             );
 
-           // let liquidity_asset_id = <LiquidityAssets<T>>::get((first_asset_id, second_asset_id));
-
             ensure!(
-                <Pools<T>>::contains_key((first_asset_id,second_asset_id)),
-                "no such pool"
+                (<Pools<T>>::contains_key((first_asset_id, second_asset_id)) || <Pools<T>>::contains_key((second_asset_id, first_asset_id))),
+                Error::<T>::NoSuchPool,
             );
 
             // ensure!(
@@ -341,11 +311,11 @@ decl_module! {
 
             ensure!(
                 <generic_asset::Module<T>>::free_balance(&first_asset_id, &sender) >= first_asset_amount,
-                "not enough asset"
+                Error::<T>::NotEnoughAssets,
             );
             ensure!(
                 <generic_asset::Module<T>>::free_balance(&second_asset_id, &sender) >= second_asset_amount,
-                "not enough asset"
+                Error::<T>::NotEnoughAssets,
             );
 
             <generic_asset::Module<T>>::make_transfer_with_event(
@@ -398,10 +368,14 @@ decl_module! {
             //get liquidity_asset_id of selected pool
             let liquidity_asset_id = Self::get_liquidity_asset(first_asset_id, second_asset_id);
 
-            //TODO ensure user has enough liquidity assets
+            ensure!(
+                <Pools<T>>::contains_key((first_asset_id, second_asset_id)),
+                Error::<T>::NoSuchPool,
+            );
+          
             ensure!(
                 <generic_asset::Module<T>>::free_balance(&liquidity_asset_id, &sender) >= liquidity_asset_amount,
-                "not enough asset"
+                Error::<T>::NotEnoughAssets,
             );
 
             let first_asset_reserve = <Pools<T>>::get((first_asset_id, second_asset_id));

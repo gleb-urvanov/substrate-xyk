@@ -1,5 +1,3 @@
-// Creating mock runtime here
-
 use crate::{Module, Trait};
 use sp_core::H256;
 
@@ -60,7 +58,9 @@ impl generic_asset::Trait for Test {
 }
 
 pub type XykStorage = Module<Test>;
-pub type GenericAsset = Module<Test>;
+
+
+
 
 // This function basically just builds a genesis storage key/value store according to
 // our desired mockup.
