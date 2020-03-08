@@ -3,15 +3,22 @@
 /// For more guidance on Substrate modules, see the example module
 /// https://github.com/paritytech/substrate/blob/master/frame/example/src/lib.rs
 // TODO documentation!
-use sp_runtime::traits::SaturatedConversion;
+// TODO ensure what if liq pool 0
+
 use codec::{Decode, Encode, HasCompact, Input, Output, Error as CodecError};
 use frame_support::{
-    decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, ensure, StorageMap,
+    decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, ensure, StorageMap, traits::Randomness,
 };
 
 use generic_asset::{AssetOptions, Owner, PermissionLatest};
 use system::ensure_signed;
-
+use sp_runtime::traits::{
+    SaturatedConversion,
+    Hash,
+    BlakeTwo256,
+    Zero,
+    One
+};
 
 #[cfg(test)]
 mod mock;
@@ -22,7 +29,7 @@ mod tests;
 pub trait Trait: generic_asset::Trait {
     // TODO: Add other types and constants required configure this module.
     // type Hashing = BlakeTwo256;
-
+    type Randomness: Randomness<Self::Hash>;
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
@@ -57,15 +64,12 @@ decl_storage! {
         // alicethepool wonderland
         VaultId get(vault_id): T::AccountId;
 
-        Pools get(asset_pool): map hasher(blake2_256) (T::AssetId, T::AssetId) => T::Balance;
-       
-        LiquidityAssets get(liquidity_pool): map hasher(blake2_256) (T::AssetId, T::AssetId) => T::AssetId;
-
         TotalLiquidities get(totalliquidity): map hasher(blake2_256) T::AssetId => T::Balance;
 
         //feature needed just these 2
         //TotalLiquidities get(totalliquidity): map hasher(blake2_256) T::AssetId => T::Balance;
-        //Vaults get(vault): map hasher(blake2_256) AssetId => T::AccountId;
+        Vaults get(vault): map hasher(blake2_256) T::AssetId => T::AccountId;
+        Nonce get(fn nonce): u32;
     }
 }
 
@@ -82,6 +86,8 @@ decl_module! {
                 Error::<T>::VaultAlreadySet,
             );
             <VaultId<T>>::put(sender);
+            
+         //   <system::Module<T>>::on_created_account(100.saturated_into::<T::AccountId>());
 
             Ok(())
         }
@@ -95,21 +101,26 @@ decl_module! {
         ) -> DispatchResult {
            
             let sender = ensure_signed(origin.clone())?;
+           // let random_hash = Self::generate_random_hash();
 
-            let vault_address: T::AccountId  = <VaultId<T>>::get();
+            //todo set proper vault
+
+            let vault_address: T::AccountId;
+
+
 
             //  TODO ensure assets exists ?
             //  TODO asset1 != asset2
 
-            ensure!(
-                !<Pools<T>>::contains_key((first_asset_id, second_asset_id)),
-                Error::<T>::PoolAlreadyExists,
-            );
+            // ensure!(
+            //     !<Pools<T>>::contains_key((first_asset_id, second_asset_id)),
+            //     Error::<T>::PoolAlreadyExists,
+            // );
 
-            ensure!(
-                !<Pools<T>>::contains_key((second_asset_id,first_asset_id)),
-                Error::<T>::PoolAlreadyExists,
-            );
+            // ensure!(
+            //     !<Pools<T>>::contains_key((second_asset_id,first_asset_id)),
+            //     Error::<T>::PoolAlreadyExists,
+            // );
 
             ensure!(
                 <generic_asset::Module<T>>::free_balance(&first_asset_id, &sender) >= first_asset_amount,
@@ -121,27 +132,24 @@ decl_module! {
                 Error::<T>::NotEnoughAssets,
             );
             
-            <Pools<T>>::insert(
-                (first_asset_id, second_asset_id), first_asset_amount.clone()
-            );
-            <Pools<T>>::insert(
-                (second_asset_id, first_asset_id), second_asset_amount.clone()
+            let liquidity_asset_id = Self::get_liquidity_asset(
+                first_asset_id,
+                second_asset_id
             );
 
-            let liquidity_asset_id = <generic_asset::Module<T>>::next_asset_id();
-
-            <LiquidityAssets<T>>::insert(
-                (first_asset_id, second_asset_id), liquidity_asset_id.clone()
+            <Vaults<T>>::insert(
+                liquidity_asset_id,
+                &vault_address
             );
 
             let initial_liquidity = first_asset_amount + second_asset_amount; //for example, doesn't really matter
        
-            Self::create_asset_to(origin.clone(), initial_liquidity);
+            //maybe create to pool and then transfer ?
+            Self::create_asset_to(origin.clone(),liquidity_asset_id, initial_liquidity);
            
             <TotalLiquidities<T>>::insert(
                 liquidity_asset_id.clone(), initial_liquidity.clone()
             );
-
 
             <generic_asset::Module<T>>::make_transfer_with_event(
                 &first_asset_id,
@@ -169,15 +177,14 @@ decl_module! {
         ) -> DispatchResult {
             let sender = ensure_signed(origin)?;
 
-            // TODO ensure sender has enough assets
-           
-            ensure!(
-                <Pools<T>>::contains_key((sold_asset_id,bought_asset_id)),
-                Error::<T>::NoSuchPool,
+            let liquidity_asset_id = Self::get_liquidity_asset(
+                sold_asset_id,
+                bought_asset_id
             );
+            let vault = <Vaults<T>>::get(liquidity_asset_id);
 
-            let input_reserve = <Pools<T>>::get((sold_asset_id, bought_asset_id));
-            let output_reserve = <Pools<T>>::get((bought_asset_id, sold_asset_id));
+            let input_reserve = Self::get_free_balance(sold_asset_id, vault.clone());
+            let output_reserve = Self::get_free_balance(bought_asset_id, vault.clone());
 
             let bought_asset_amount = Self::calculate_sell_price(
                 input_reserve,
@@ -186,11 +193,14 @@ decl_module! {
             );
 
             ensure!(
-                <generic_asset::Module<T>>::free_balance(&sold_asset_id, &sender) >= sold_asset_amount,
+                <Vaults<T>>::contains_key(liquidity_asset_id),
+                Error::<T>::NoSuchPool,
+            );
+            ensure!(
+                Self::get_free_balance(sold_asset_id, sender.clone()) >= sold_asset_amount,
                 Error::<T>::NotEnoughAssets,
             );
 
-            let vault = <VaultId<T>>::get();
             <generic_asset::Module<T>>::make_transfer_with_event(
                 &sold_asset_id,
                 &sender,
@@ -204,16 +214,6 @@ decl_module! {
                 &sender,
                 bought_asset_amount,
             )?;
-
-            <Pools<T>>::insert(
-                (sold_asset_id, bought_asset_id),
-                input_reserve + sold_asset_amount,
-            );
-
-            <Pools<T>>::insert(
-                (bought_asset_id, sold_asset_id),
-                output_reserve - bought_asset_amount,
-            );
 
             Ok(())
         }
@@ -226,18 +226,14 @@ decl_module! {
         ) -> DispatchResult {
             let sender = ensure_signed(origin)?;
 
-            ensure!(
-                <Pools<T>>::contains_key((sold_asset_id,bought_asset_id)),
-                Error::<T>::NoSuchPool,
+            let liquidity_asset_id = Self::get_liquidity_asset(
+                sold_asset_id,
+                bought_asset_id
             );
+            let vault = <Vaults<T>>::get(liquidity_asset_id);
 
-            let input_reserve = <Pools<T>>::get((sold_asset_id, bought_asset_id));
-            let output_reserve = <Pools<T>>::get((bought_asset_id, sold_asset_id));
-
-            ensure!(
-                output_reserve > bought_asset_amount,
-                Error::<T>::NotEnoughReserve,
-            );
+            let input_reserve = Self::get_free_balance(sold_asset_id, vault.clone());
+            let output_reserve = Self::get_free_balance(bought_asset_id, vault.clone());
 
             let sold_asset_amount = Self::calculate_buy_price(
                 input_reserve,
@@ -246,11 +242,18 @@ decl_module! {
             );
 
             ensure!(
+                <Vaults<T>>::contains_key(liquidity_asset_id),
+                Error::<T>::NoSuchPool,
+            );
+            ensure!(
+                output_reserve > bought_asset_amount,
+                Error::<T>::NotEnoughReserve,
+            );
+            ensure!(
                 <generic_asset::Module<T>>::free_balance(&sold_asset_id, &sender) >= sold_asset_amount,
                 Error::<T>::NotEnoughAssets,
             );
 
-            let vault = <VaultId<T>>::get();
             <generic_asset::Module<T>>::make_transfer_with_event(
                 &sold_asset_id,
                 &sender,
@@ -265,16 +268,6 @@ decl_module! {
                 bought_asset_amount,
             )?;
 
-            <Pools<T>>::insert(
-                (sold_asset_id, bought_asset_id),
-                input_reserve + sold_asset_amount,
-            );
-
-            <Pools<T>>::insert(
-                (bought_asset_id, sold_asset_id),
-                output_reserve - bought_asset_amount,
-            );
-
             Ok(())
         }
 
@@ -285,7 +278,7 @@ decl_module! {
             first_asset_amount: T::Balance,
         ) -> DispatchResult {
             let sender = ensure_signed(origin)?;
-            let vault = <VaultId<T>>::get();
+         
 
             //get liquidity_asset_id of selected pool
             let liquidity_asset_id = Self::get_liquidity_asset(
@@ -293,8 +286,9 @@ decl_module! {
                  second_asset_id
             );
 
+            let vault = <Vaults<T>>::get(liquidity_asset_id);
             ensure!(
-                (<Pools<T>>::contains_key((first_asset_id, second_asset_id)) || <Pools<T>>::contains_key((second_asset_id, first_asset_id))),
+                <Vaults<T>>::contains_key(liquidity_asset_id),
                 Error::<T>::NoSuchPool,
             );
 
@@ -303,18 +297,18 @@ decl_module! {
             //     "pool has no liquidity"
             // );
 
-            let first_asset_reserve = <Pools<T>>::get((first_asset_id, second_asset_id));
-            let second_asset_reserve = <Pools<T>>::get((second_asset_id, first_asset_id));
+            let first_asset_reserve = Self::get_free_balance(first_asset_id, vault.clone());
+            let second_asset_reserve = Self::get_free_balance(second_asset_id, vault.clone());
             let second_asset_amount = first_asset_amount * second_asset_reserve / first_asset_reserve + 1.saturated_into::<T::Balance>();
             let total_liquidity_assets = <TotalLiquidities<T>>::get(liquidity_asset_id);
             let liquidity_assets_minted = first_asset_amount * total_liquidity_assets / first_asset_reserve;
 
             ensure!(
-                <generic_asset::Module<T>>::free_balance(&first_asset_id, &sender) >= first_asset_amount,
+                Self::get_free_balance(first_asset_id, sender.clone()) >= first_asset_amount,
                 Error::<T>::NotEnoughAssets,
             );
             ensure!(
-                <generic_asset::Module<T>>::free_balance(&second_asset_id, &sender) >= second_asset_amount,
+                Self::get_free_balance(second_asset_id, sender.clone()) >= second_asset_amount,
                 Error::<T>::NotEnoughAssets,
             );
 
@@ -331,16 +325,6 @@ decl_module! {
                 &vault,
                 second_asset_amount,
             )?;
-
-            <Pools<T>>::insert(
-                (&first_asset_id, &second_asset_id),
-                first_asset_reserve + first_asset_amount,
-            );
-
-            <Pools<T>>::insert(
-                (&second_asset_id, &first_asset_id),
-                second_asset_reserve + second_asset_amount,
-            );
 
             let new_total_liquidity = <TotalLiquidities<T>>::get(liquidity_asset_id) + liquidity_assets_minted.clone();
             <TotalLiquidities<T>>::insert(liquidity_asset_id.clone(), new_total_liquidity.clone());
@@ -363,23 +347,25 @@ decl_module! {
             liquidity_asset_amount: T::Balance,
         ) -> DispatchResult {
             let sender = ensure_signed(origin)?;
-            let vault = <VaultId<T>>::get();
-            
-            //get liquidity_asset_id of selected pool
-            let liquidity_asset_id = Self::get_liquidity_asset(first_asset_id, second_asset_id);
+            let liquidity_asset_id = Self::get_liquidity_asset(
+                first_asset_id,
+                second_asset_id
+            );
 
+            let vault = <Vaults<T>>::get(liquidity_asset_id);
+            
             ensure!(
-                <Pools<T>>::contains_key((first_asset_id, second_asset_id)),
+                <Vaults<T>>::contains_key(liquidity_asset_id),
                 Error::<T>::NoSuchPool,
             );
           
             ensure!(
-                <generic_asset::Module<T>>::free_balance(&liquidity_asset_id, &sender) >= liquidity_asset_amount,
+                Self::get_free_balance(liquidity_asset_id, sender.clone()) >= liquidity_asset_amount,
                 Error::<T>::NotEnoughAssets,
             );
 
-            let first_asset_reserve = <Pools<T>>::get((first_asset_id, second_asset_id));
-            let second_asset_reserve = <Pools<T>>::get((second_asset_id, first_asset_id));
+            let first_asset_reserve = Self::get_free_balance(first_asset_id, vault.clone());
+            let second_asset_reserve = Self::get_free_balance(second_asset_id, vault.clone());
             let first_asset_amount = first_asset_reserve * liquidity_asset_amount / <TotalLiquidities<T>>::get(liquidity_asset_id);
             let second_asset_amount = second_asset_reserve * liquidity_asset_amount / <TotalLiquidities<T>>::get(liquidity_asset_id);
 
@@ -397,15 +383,6 @@ decl_module! {
                 second_asset_amount,
             )?;
 
-            <Pools<T>>::insert(
-                (&first_asset_id, &second_asset_id),
-                first_asset_reserve - first_asset_amount,
-            );
-
-            <Pools<T>>::insert(
-                (&second_asset_id, &first_asset_id),
-                second_asset_reserve - second_asset_amount,
-            );
 
             let new_total_liquidity = <TotalLiquidities<T>>::get(liquidity_asset_id) - liquidity_asset_amount;
             <TotalLiquidities<T>>::insert(
@@ -458,17 +435,20 @@ impl<T: Trait> Module<T> {
         first_asset_id: T::AssetId,
         second_asset_id: T::AssetId
     ) -> T::AssetId {
-        if <LiquidityAssets<T>>::contains_key((first_asset_id, second_asset_id)){
-            return <LiquidityAssets<T>>::get((first_asset_id, second_asset_id))
+        let liquidity_asset_id = first_asset_id * 1000.saturated_into::<T::AssetId>() + second_asset_id;
+        if <Vaults<T>>::contains_key(liquidity_asset_id){
+            return liquidity_asset_id
         }
         else{
-            return <LiquidityAssets<T>>::get((second_asset_id, first_asset_id))
+            return second_asset_id * 1000.saturated_into::<T::AssetId>() + first_asset_id
         }
     }
 
     fn create_asset_to(
         origin: T::Origin,
-        amount: T::Balance,      
+        assetId: T::AssetId,
+        amount: T::Balance,   
+
     ) -> DispatchResult {
         
         let vault: T::AccountId  = <VaultId<T>>::get();
@@ -480,7 +460,7 @@ impl<T: Trait> Module<T> {
 			burn: Owner::Address(vault.clone()),
 		};
 
-		<generic_asset::Module<T>>::create_asset(None, Some(sender.clone()), generic_asset::AssetOptions {
+		<generic_asset::Module<T>>::create_asset(Some(assetId), Some(sender.clone()), generic_asset::AssetOptions {
 			initial_issuance: amount,
 		 	permissions: default_permission,
 		})?;
@@ -494,7 +474,23 @@ impl<T: Trait> Module<T> {
     ) -> T::Balance {
        return <generic_asset::Module<T>>::free_balance(&assetId, &from)
     }
-  
+
+    fn generate_random_hash() -> T::Hash {
+
+        let nonce = <Nonce>::get();
+
+        let random_seed = T::Randomness::random_seed();
+        let new_random = (random_seed, nonce)
+            .using_encoded(|b| BlakeTwo256::hash(b))
+            .using_encoded(|mut b| u64::decode(&mut b))
+            .expect("Hash must be bigger than 8 bytes; Qed");
+
+        let new_nonce = <Nonce>::get() + 1;
+        <Nonce>::put(new_nonce);
+
+        return (new_random).using_encoded(<T as system::Trait>::Hashing::hash)
+    }
+
     // //Read-only function to be used by RPC
     // pub fn get_exchange_input_price(
     //     input_asset_id: T::AssetId,

@@ -18,6 +18,8 @@ package = 'pallet-balances'
 rev = '3cc0973aff3f5b507c8ed1a13934bd35697b251f'
 version = '2.0.0'
 
+
+
 [dependencies.codec]
 default-features = false
 features = ['derive']

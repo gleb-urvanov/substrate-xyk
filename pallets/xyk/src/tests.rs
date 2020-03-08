@@ -52,12 +52,14 @@ fn initialize() {
 	XykStorage::set_vault_id(Origin::signed(1));
 	// creating asset with assetId 0 and minting to accountId 2
 	XykStorage::create_asset_to(
-		 Origin::signed(2),
+		Origin::signed(2),
+		0,
 		1000000,
 	);
 	// creating asset with assetId 1 and minting to accountId 2
 	XykStorage::create_asset_to(
-		 Origin::signed(2),
+		Origin::signed(2),
+		1,
 		1000000,
 	);
 	// creating pool by assetId 2
@@ -100,12 +102,14 @@ fn create_pool_W() {
 		XykStorage::set_vault_id(Origin::signed(1));
 		// creating asset with assetId 0 and minting to accountId 2
 		XykStorage::create_asset_to(
-		 	Origin::signed(2),
+			Origin::signed(2),
+			0,
 			1000000,
 		);
 		// creating asset with assetId 1 and minting to accountId 2
 		XykStorage::create_asset_to(
-		 	Origin::signed(2),
+			Origin::signed(2),
+			1,
 			1000000,
 		);
 		// creating pool by assetId 2
@@ -533,11 +537,13 @@ fn buy_N_not_enough_reserve() {
 		// creating asset with assetId 0 and minting to accountId 2
 		XykStorage::create_asset_to(
 			Origin::signed(2),
+			0,
 			1000000,
 		);
 		// creating asset with assetId 1 and minting to accountId 2
 		XykStorage::create_asset_to(
 			Origin::signed(2),
+			1,
 			1000000,
 		);
 		// creating pool by assetId 2
@@ -570,11 +576,13 @@ fn buy_N_not_enough_selling_assset() {
 		// creating asset with assetId 0 and minting to accountId 2
 		XykStorage::create_asset_to(
 			Origin::signed(2),
+			0,
 			600000,
 		);
 		// creating asset with assetId 1 and minting to accountId 2
 		XykStorage::create_asset_to(
 			Origin::signed(2),
+			1,
 			600000,
 		);
 		// creating pool by assetId 2

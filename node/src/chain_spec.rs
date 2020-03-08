@@ -63,6 +63,11 @@ impl Alternative {
                             get_account_id_from_seed::<sr25519::Public>("Bob"),
                             get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
                             get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
+                            get_account_id_from_seed::<sr25519::Public>("vault1"),
+                            get_account_id_from_seed::<sr25519::Public>("vault2"),
+                            get_account_id_from_seed::<sr25519::Public>("vault3"),
+                            get_account_id_from_seed::<sr25519::Public>("vault4"),
+                            get_account_id_from_seed::<sr25519::Public>("vault5"),
                         ],
                         true,
                     )
@@ -96,6 +101,11 @@ impl Alternative {
                             get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
                             get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
                             get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
+                            get_account_id_from_seed::<sr25519::Public>("vault1"),
+                            get_account_id_from_seed::<sr25519::Public>("vault2"),
+                            get_account_id_from_seed::<sr25519::Public>("vault3"),
+                            get_account_id_from_seed::<sr25519::Public>("vault4"),
+                            get_account_id_from_seed::<sr25519::Public>("vault5"),
                         ],
                         true,
                     )
