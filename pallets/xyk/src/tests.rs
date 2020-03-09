@@ -13,28 +13,33 @@ use frame_support::{assert_ok, assert_noop, assert_err};
 //fn create_pool_N_not_enough_first_asset(): create_pool not working if account has not enough first asset for initial mint //DONE
 //fn create_pool_N_not_enough_second_asset(): create_pool not working if account has not enough second asset for initial mint //DONE
 //fn create_pool not working if no such assets  //TODO?
+// 0 amount
 
 //fn sell_W(): sell working assert (maps,acocounts values) //DONE
 //fn sell_W_other_way(): sell working if sell order in different order as pool (sell pool X-Y, but pool Y-X exists), assert (maps,acocounts values) //DONE
 //fn sell_N_not_enough_selling_assset(): sell not working if not enough asset to sell //DONE
 //fn sell_N_no_such_pool(): sell not working if pool does not exist //DONE
+// 0 amount
 
 //fn buy_W(): buy working assert (maps,acocounts values) //DONE
 //fn buy_W_other_way(): buy working if buy order in different order as pool (buy pool X-Y, but pool Y-X exists), assert (maps,acocounts values) //DONE
 //fn buy_N_not_enough_selling_assset(): buy not working if not enough asset to sell //DONE
 //fn buy_N_not_enough_reserve(): buy not working if not enough liquidity in pool //DONE
 //fn buy_N_no_such_pool(): buy not working if pool does not exist //DONE
+// 0 amount
 
 //fn mint_W(): mint working assert (maps,acocounts values) //DONE
 //fn mint_W_other_way(): mint working if mint order in different order as pool (mint pool X-Y, but pool Y-X exists), assert (maps,acocounts values) //DONE
 //fn mint_N_no_such_pool(): mint not working if pool does not exist //DONE
 //fn mint_N_not_enough_first_asset(): mint not working, not enough first assets to mint with //DONE
 //fn mint_N_not_enough_second_asset(): mint not working, not enough second assets to mint with //DONE
+// 0 amount
 
 //fn burn_W(): burn working assert (maps,acocounts values) //DONE
 //fn burn_W_other_way(): burn working if burn order in different order as pool (burn pool X-Y, but pool Y-X exists), assert (maps,acocounts values) //DONE
 //fn burn_N_no_such_pool(): burn not working if pool does not exist //DONE
 //fn burn_N_not_enough_liquidity_asset(): burn not enough liquidity assets to burn //DONE
+// 0 amount
 
 
 pub trait Trait: generic_asset::Trait {

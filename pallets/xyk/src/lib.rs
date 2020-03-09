@@ -36,6 +36,7 @@ decl_error! {
         NotEnoughAssets,
         NoSuchPool,
         NotEnoughReserve,
+        ZeroAmount,
 	}
 }
 
@@ -292,6 +293,11 @@ decl_module! {
                  first_asset_id,
                  second_asset_id
             );
+
+            ensure!(
+				!first_asset_amount.is_zero() && !second_asset_amount.is_zero(),
+				Error::<T>::ZeroAmount,
+			);
 
             ensure!(
                 (<Pools<T>>::contains_key((first_asset_id, second_asset_id)) || <Pools<T>>::contains_key((second_asset_id, first_asset_id))),
