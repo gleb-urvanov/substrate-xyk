@@ -3,10 +3,24 @@
 /// For more guidance on Substrate modules, see the example module
 /// https://github.com/paritytech/substrate/blob/master/frame/example/src/lib.rs
 // TODO documentation!
-use sp_runtime::traits::SaturatedConversion;
-use codec::{Decode, Encode, HasCompact, Input, Output, Error as CodecError};
+
+use sp_runtime::traits::{
+    SaturatedConversion,
+    Hash,
+    BlakeTwo256,
+    Zero,
+    One
+};
+
+use codec::{ Encode, Decode };
 use frame_support::{
-    decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, ensure, StorageMap,
+    decl_event,
+    decl_module,
+    decl_storage,
+    dispatch::DispatchResult,
+    ensure,
+    StorageMap,
+    traits::Randomness
 };
 
 use generic_asset::{AssetOptions, Owner, PermissionLatest};
@@ -23,7 +37,7 @@ pub trait Trait: generic_asset::Trait {
     // TODO: Add other types and constants required configure this module.
     // type Hashing = BlakeTwo256;
 
-    /// The overarching event type.
+    type Randomness: Randomness<Self::Hash>;
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
 
@@ -94,74 +108,57 @@ decl_module! {
             second_asset_id: T::AssetId,
             second_asset_amount: T::Balance
         ) -> DispatchResult {
-           
             let sender = ensure_signed(origin.clone())?;
-
             let vault_address: T::AccountId  = <VaultId<T>>::get();
-
             //  TODO ensure assets exists ?
             //  TODO asset1 != asset2
-
             ensure!(
                 !<Pools<T>>::contains_key((first_asset_id, second_asset_id)),
                 Error::<T>::PoolAlreadyExists,
             );
-
             ensure!(
                 !<Pools<T>>::contains_key((second_asset_id,first_asset_id)),
                 Error::<T>::PoolAlreadyExists,
             );
-
             ensure!(
                 <generic_asset::Module<T>>::free_balance(&first_asset_id, &sender) >= first_asset_amount,
                 Error::<T>::NotEnoughAssets,
             );
-
             ensure!(
                 <generic_asset::Module<T>>::free_balance(&second_asset_id, &sender) >= second_asset_amount,
                 Error::<T>::NotEnoughAssets,
             );
-            
             <Pools<T>>::insert(
                 (first_asset_id, second_asset_id), first_asset_amount.clone()
             );
             <Pools<T>>::insert(
                 (second_asset_id, first_asset_id), second_asset_amount.clone()
             );
-
             let liquidity_asset_id = <generic_asset::Module<T>>::next_asset_id();
-
             <LiquidityAssets<T>>::insert(
                 (first_asset_id, second_asset_id), liquidity_asset_id.clone()
             );
-
             let initial_liquidity = first_asset_amount + second_asset_amount; //for example, doesn't really matter
-       
             Self::create_asset_to(origin.clone(), initial_liquidity);
-           
             <TotalLiquidities<T>>::insert(
                 liquidity_asset_id.clone(), initial_liquidity.clone()
             );
-
-
             <generic_asset::Module<T>>::make_transfer_with_event(
                 &first_asset_id,
                 &sender,
                 &vault_address,
                 first_asset_amount.clone()
             )?;
-
             <generic_asset::Module<T>>::make_transfer_with_event(
                 &second_asset_id,
                 &sender,
                 &vault_address,
                 second_asset_amount.clone()
             )?;
-
             Ok(())
         }
 
-        // you will sell your sold_asset_amount of sold_asset_id to get some amount of bought_asset_id
+        /// you will sell your sold_asset_amount of sold_asset_id to get some amount of bought_asset_id
         fn sell_asset (
             origin,
             sold_asset_id: T::AssetId,
@@ -232,8 +229,8 @@ decl_module! {
                 Error::<T>::NoSuchPool,
             );
 
-            let input_reserve = <Pools<T>>::get((sold_asset_id, bought_asset_id));
-            let output_reserve = <Pools<T>>::get((bought_asset_id, sold_asset_id));
+            let input_reserve = <PoolBalance<T>>::get((sold_asset_id, bought_asset_id));
+            let output_reserve = <PoolBalance<T>>::get((bought_asset_id, sold_asset_id));
 
             ensure!(
                 output_reserve > bought_asset_amount,
@@ -266,12 +263,12 @@ decl_module! {
                 bought_asset_amount,
             )?;
 
-            <Pools<T>>::insert(
+            <PoolBalance<T>>::insert(
                 (sold_asset_id, bought_asset_id),
                 input_reserve + sold_asset_amount,
             );
 
-            <Pools<T>>::insert(
+            <PoolBalance<T>>::insert(
                 (bought_asset_id, sold_asset_id),
                 output_reserve - bought_asset_amount,
             );
@@ -433,30 +430,45 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
+    fn generate_random_hash() -> T::Hash {
+
+        let nonce = <Nonce>::get();
+
+        let random_seed = T::Randomness::random_seed();
+        let new_random = (random_seed, nonce)
+            .using_encoded(|b| BlakeTwo256::hash(b))
+            .using_encoded(|mut b| u64::decode(&mut b))
+            .expect("Hash must be bigger than 8 bytes; Qed");
+
+        let new_nonce = <Nonce>::get() + 1;
+        <Nonce>::put(new_nonce);
+
+        return (new_random).using_encoded(<T as system::Trait>::Hashing::hash)
+    }
+
     pub fn calculate_sell_price(
         input_reserve: T::Balance,
         output_reserve: T::Balance,
-        input_amount: T::Balance,
+        sell_amount: T::Balance,
     ) -> T::Balance {
         // input_amount_with_fee: uint256 = input_amount * 997
-        let input_amount_with_fee = input_amount * 997.saturated_into::<T::Balance>();
+        let input_amount_with_fee = sell_amount * 997.saturated_into::<T::Balance>();
         // numerator: uint256 = input_amount_with_fee * output_reserve
         let numerator = input_amount_with_fee * output_reserve;
         // denominator: uint256 = (input_reserve * 1000) + input_amount_with_fee
-        let denominator =
-            (input_reserve * 1000.saturated_into::<T::Balance>()) + input_amount_with_fee;
+        let denominator = (input_reserve * 1000.saturated_into::<T::Balance>()) + input_amount_with_fee;
         numerator / denominator
     }
 
     pub fn calculate_buy_price(
         input_reserve: T::Balance,
         output_reserve: T::Balance,
-        output_amount: T::Balance,
+        buy_amount: T::Balance,
     ) -> T::Balance {
         // numerator: uint256 = input_reserve * output_amount * 1000
-        let numerator = input_reserve * output_amount * 1000.saturated_into::<T::Balance>();
+        let numerator = input_reserve * buy_amount * 1000.saturated_into::<T::Balance>();
         // denominator: uint256 = (output_reserve - output_amount) * 997
-        let denominator = (output_reserve - output_amount) * 997.saturated_into::<T::Balance>();
+        let denominator = (output_reserve - buy_amount) * 997.saturated_into::<T::Balance>();
         numerator / denominator + 1.saturated_into::<T::Balance>()
     }
 
