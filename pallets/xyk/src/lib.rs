@@ -7,7 +7,13 @@ use sp_runtime::traits::{BlakeTwo256, Hash, One, SaturatedConversion, Zero};
 
 use codec::{Decode, Encode};
 use frame_support::{
-    decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure, traits::Randomness,
+    decl_event,
+    decl_module,
+    decl_storage, 
+    decl_error,
+    dispatch::DispatchResult, 
+    ensure, 
+    traits::Randomness,
     StorageMap,
 };
 
@@ -61,13 +67,10 @@ decl_storage! {
 
         Pools get(asset_pool): map hasher(blake2_256) (T::AssetId, T::AssetId) => T::Balance;
 
-        LiquidityAssets get(liquidity_pool): map hasher(blake2_256) (T::AssetId, T::AssetId) => T::AssetId;
+        LiquidityAssets get(liquidity_asset): map hasher(blake2_256) (T::AssetId, T::AssetId) => T::AssetId;
 
-        TotalLiquidities get(totalliquidity): map hasher(blake2_256) T::AssetId => T::Balance;
-
-        //feature needed just these 2
-        //TotalLiquidities get(totalliquidity): map hasher(blake2_256) T::AssetId => T::Balance;
-        //Vaults get(vault): map hasher(blake2_256) AssetId => T::AccountId;
+        LiquidityPools get(liquidity_pool): map hasher(blake2_256) T::AssetId => (T::AssetId, T::AssetId);
+        Nonce get (fn nonce): u32;
     }
 }
 
@@ -125,11 +128,12 @@ decl_module! {
             <LiquidityAssets<T>>::insert(
                 (first_asset_id, second_asset_id), liquidity_asset_id.clone()
             );
-            let initial_liquidity = first_asset_amount + second_asset_amount; //for example, doesn't really matter
-            Self::create_asset_to(origin.clone(), initial_liquidity);
-            <TotalLiquidities<T>>::insert(
-                liquidity_asset_id.clone(), initial_liquidity.clone()
+            <LiquidityPools<T>>::insert(
+                liquidity_asset_id.clone(), (first_asset_id, second_asset_id) 
             );
+            let initial_liquidity = first_asset_amount + second_asset_amount; //for example, doesn't really matter
+            Self::create_asset(origin.clone(), initial_liquidity);
+           
             <generic_asset::Module<T>>::make_transfer_with_event(
                 &first_asset_id,
                 &sender,
@@ -216,8 +220,8 @@ decl_module! {
                 Error::<T>::NoSuchPool,
             );
 
-            let input_reserve = <PoolBalance<T>>::get((sold_asset_id, bought_asset_id));
-            let output_reserve = <PoolBalance<T>>::get((bought_asset_id, sold_asset_id));
+            let input_reserve = <Pools<T>>::get((sold_asset_id, bought_asset_id));
+            let output_reserve = <Pools<T>>::get((bought_asset_id, sold_asset_id));
 
             ensure!(
                 output_reserve > bought_asset_amount,
@@ -250,12 +254,12 @@ decl_module! {
                 bought_asset_amount,
             )?;
 
-            <PoolBalance<T>>::insert(
+            <Pools<T>>::insert(
                 (sold_asset_id, bought_asset_id),
                 input_reserve + sold_asset_amount,
             );
 
-            <PoolBalance<T>>::insert(
+            <Pools<T>>::insert(
                 (bought_asset_id, sold_asset_id),
                 output_reserve - bought_asset_amount,
             );
@@ -277,12 +281,7 @@ decl_module! {
                  first_asset_id,
                  second_asset_id
             );
-
-            ensure!(
-                !first_asset_amount.is_zero() && !second_asset_amount.is_zero(),
-                Error::<T>::ZeroAmount,
-            );
-
+           
             ensure!(
                 (<Pools<T>>::contains_key((first_asset_id, second_asset_id)) || <Pools<T>>::contains_key((second_asset_id, first_asset_id))),
                 Error::<T>::NoSuchPool,
@@ -296,9 +295,13 @@ decl_module! {
             let first_asset_reserve = <Pools<T>>::get((first_asset_id, second_asset_id));
             let second_asset_reserve = <Pools<T>>::get((second_asset_id, first_asset_id));
             let second_asset_amount = first_asset_amount * second_asset_reserve / first_asset_reserve + 1.saturated_into::<T::Balance>();
-            let total_liquidity_assets = <TotalLiquidities<T>>::get(liquidity_asset_id);
+            let total_liquidity_assets = <generic_asset::Module<T>>::total_issuance(liquidity_asset_id);
             let liquidity_assets_minted = first_asset_amount * total_liquidity_assets / first_asset_reserve;
 
+            ensure!(
+                !first_asset_amount.is_zero() && !second_asset_amount.is_zero(),
+                Error::<T>::ZeroAmount,
+            );
             ensure!(
                 <generic_asset::Module<T>>::free_balance(&first_asset_id, &sender) >= first_asset_amount,
                 Error::<T>::NotEnoughAssets,
@@ -332,10 +335,6 @@ decl_module! {
                 second_asset_reserve + second_asset_amount,
             );
 
-            let new_total_liquidity = <TotalLiquidities<T>>::get(liquidity_asset_id) + liquidity_assets_minted.clone();
-            <TotalLiquidities<T>>::insert(liquidity_asset_id.clone(), new_total_liquidity.clone());
-
-            //TODO mint_free of liqudity_pool_id asset to sender in an amount of += liquidity_assets_minted
             <generic_asset::Module<T>>::mint_free(
                  &liquidity_asset_id,
                  &vault,
@@ -370,8 +369,8 @@ decl_module! {
 
             let first_asset_reserve = <Pools<T>>::get((first_asset_id, second_asset_id));
             let second_asset_reserve = <Pools<T>>::get((second_asset_id, first_asset_id));
-            let first_asset_amount = first_asset_reserve * liquidity_asset_amount / <TotalLiquidities<T>>::get(liquidity_asset_id);
-            let second_asset_amount = second_asset_reserve * liquidity_asset_amount / <TotalLiquidities<T>>::get(liquidity_asset_id);
+            let first_asset_amount = first_asset_reserve * liquidity_asset_amount / <generic_asset::Module<T>>::total_issuance(liquidity_asset_id);
+            let second_asset_amount = second_asset_reserve * liquidity_asset_amount / <generic_asset::Module<T>>::total_issuance(liquidity_asset_id);
 
             <generic_asset::Module<T>>::make_transfer_with_event(
                 &first_asset_id,
@@ -395,12 +394,6 @@ decl_module! {
             <Pools<T>>::insert(
                 (&second_asset_id, &first_asset_id),
                 second_asset_reserve - second_asset_amount,
-            );
-
-            let new_total_liquidity = <TotalLiquidities<T>>::get(liquidity_asset_id) - liquidity_asset_amount;
-            <TotalLiquidities<T>>::insert(
-                liquidity_asset_id.clone(),
-                new_total_liquidity.clone(),
             );
 
             //TODO burn_free of liqudity_pool_id asset to sender in an amount of += liquidity_assets_minted
@@ -470,7 +463,7 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    fn create_asset_to(origin: T::Origin, amount: T::Balance) -> DispatchResult {
+    fn create_asset(origin: T::Origin, amount: T::Balance) -> DispatchResult {
         let vault: T::AccountId = <VaultId<T>>::get();
         let sender = ensure_signed(origin)?;
 
