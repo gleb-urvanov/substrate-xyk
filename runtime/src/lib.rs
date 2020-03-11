@@ -254,6 +254,7 @@ impl template::Trait for Runtime {
 
 impl xyk::Trait for Runtime {
     type Event = Event;
+    type Randomness = RandomnessCollectiveFlip;
 }
 
 construct_runtime!(

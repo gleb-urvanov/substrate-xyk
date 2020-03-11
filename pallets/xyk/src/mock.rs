@@ -48,6 +48,7 @@ impl system::Trait for Test {
 }
 impl Trait for Test {
 	type Event = ();
+	type Randomness = ();
 
 }
 

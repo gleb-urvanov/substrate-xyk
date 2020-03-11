@@ -389,7 +389,25 @@ fn burn_N_no_such_pool() {
 fn sell_W() {
 	new_test_ext().execute_with(|| {
 		
-		initialize();
+		XykStorage::set_vault_id(Origin::signed(1));
+		// creating asset with assetId 0 and minting to accountId 2
+		XykStorage::create_asset_to(
+			Origin::signed(2),
+			1000000,
+		);
+		// creating asset with assetId 1 and minting to accountId 2
+		XykStorage::create_asset_to(
+			Origin::signed(2),
+			1000000,
+		);
+		// creating pool by assetId 2
+		XykStorage::create_pool(
+			Origin::signed(2),
+			0,
+			500000,
+			1,
+			500000,
+		);
 		// selling 250000 assetId 0 of pool 0 1
 		XykStorage::sell_asset(
 			Origin::signed(2),
