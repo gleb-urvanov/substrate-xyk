@@ -3,16 +3,9 @@
 /// For more guidance on Substrate modules, see the example module
 /// https://github.com/paritytech/substrate/blob/master/frame/example/src/lib.rs
 // TODO documentation!
+use sp_runtime::traits::{BlakeTwo256, Hash, One, SaturatedConversion, Zero};
 
-use sp_runtime::traits::{
-    SaturatedConversion,
-    Hash,
-    BlakeTwo256,
-    Zero,
-    One
-};
-
-use codec::{ Encode, Decode };
+use codec::{Decode, Encode};
 use frame_support::{
     decl_event,
     decl_module,
@@ -21,12 +14,10 @@ use frame_support::{
     dispatch::DispatchResult,
     ensure,
     StorageMap,
-    traits::Randomness
 };
 
 use generic_asset::{AssetOptions, Owner, PermissionLatest};
 use system::ensure_signed;
-
 
 #[cfg(test)]
 mod mock;
@@ -44,15 +35,15 @@ pub trait Trait: generic_asset::Trait {
 
 decl_error! {
     /// Error for the generic-asset module.
-    
-	pub enum Error for Module<T: Trait> {
+
+    pub enum Error for Module<T: Trait> {
         VaultAlreadySet,
         PoolAlreadyExists,
         NotEnoughAssets,
         NoSuchPool,
         NotEnoughReserve,
         ZeroAmount,
-	}
+    }
 }
 
 decl_event!(
@@ -74,7 +65,7 @@ decl_storage! {
         VaultId get(vault_id): T::AccountId;
 
         Pools get(asset_pool): map hasher(blake2_256) (T::AssetId, T::AssetId) => T::Balance;
-       
+
         LiquidityAssets get(liquidity_pool): map hasher(blake2_256) (T::AssetId, T::AssetId) => T::AssetId;
 
         TotalLiquidities get(totalliquidity): map hasher(blake2_256) T::AssetId => T::Balance;
@@ -344,7 +335,7 @@ decl_module! {
         ) -> DispatchResult {
             let sender = ensure_signed(origin)?;
             let vault = <VaultId<T>>::get();
-            
+
             //get liquidity_asset_id of selected pool
             let liquidity_asset_id = Self::get_liquidity_asset(first_asset_id, second_asset_id);
 
@@ -352,7 +343,7 @@ decl_module! {
                 <Pools<T>>::contains_key((first_asset_id, second_asset_id)),
                 Error::<T>::NoSuchPool,
             );
-          
+
             ensure!(
                 <generic_asset::Module<T>>::free_balance(&liquidity_asset_id, &sender) >= liquidity_asset_amount,
                 Error::<T>::NotEnoughAssets,
@@ -408,7 +399,6 @@ decl_module! {
 
 impl<T: Trait> Module<T> {
     fn generate_random_hash() -> T::Hash {
-
         let nonce = <Nonce>::get();
 
         let random_seed = T::Randomness::random_seed();
@@ -420,7 +410,7 @@ impl<T: Trait> Module<T> {
         let new_nonce = <Nonce>::get() + 1;
         <Nonce>::put(new_nonce);
 
-        return (new_random).using_encoded(<T as system::Trait>::Hashing::hash)
+        return (new_random).using_encoded(<T as system::Trait>::Hashing::hash);
     }
 
     pub fn calculate_sell_price(
@@ -433,7 +423,8 @@ impl<T: Trait> Module<T> {
         // numerator: uint256 = input_amount_with_fee * output_reserve
         let numerator = input_amount_with_fee * output_reserve;
         // denominator: uint256 = (input_reserve * 1000) + input_amount_with_fee
-        let denominator = (input_reserve * 1000.saturated_into::<T::Balance>()) + input_amount_with_fee;
+        let denominator =
+            (input_reserve * 1000.saturated_into::<T::Balance>()) + input_amount_with_fee;
         numerator / denominator
     }
 
@@ -451,45 +442,41 @@ impl<T: Trait> Module<T> {
 
     pub fn get_liquidity_asset(
         first_asset_id: T::AssetId,
-        second_asset_id: T::AssetId
+        second_asset_id: T::AssetId,
     ) -> T::AssetId {
-        if <LiquidityAssets<T>>::contains_key((first_asset_id, second_asset_id)){
-            return <LiquidityAssets<T>>::get((first_asset_id, second_asset_id))
-        }
-        else{
-            return <LiquidityAssets<T>>::get((second_asset_id, first_asset_id))
+        if <LiquidityAssets<T>>::contains_key((first_asset_id, second_asset_id)) {
+            return <LiquidityAssets<T>>::get((first_asset_id, second_asset_id));
+        } else {
+            return <LiquidityAssets<T>>::get((second_asset_id, first_asset_id));
         }
     }
 
-    fn create_asset_to(
-        origin: T::Origin,
-        amount: T::Balance,      
-    ) -> DispatchResult {
-        
-        let vault: T::AccountId  = <VaultId<T>>::get();
+    fn create_asset_to(origin: T::Origin, amount: T::Balance) -> DispatchResult {
+        let vault: T::AccountId = <VaultId<T>>::get();
         let sender = ensure_signed(origin)?;
-        
-		let default_permission = generic_asset::PermissionLatest {
-			update: Owner::Address(vault.clone()),
-			mint: Owner::Address(vault.clone()),
-			burn: Owner::Address(vault.clone()),
-		};
 
-		<generic_asset::Module<T>>::create_asset(None, Some(sender.clone()), generic_asset::AssetOptions {
-			initial_issuance: amount,
-		 	permissions: default_permission,
-		})?;
-    
+        let default_permission = generic_asset::PermissionLatest {
+            update: Owner::Address(vault.clone()),
+            mint: Owner::Address(vault.clone()),
+            burn: Owner::Address(vault.clone()),
+        };
+
+        <generic_asset::Module<T>>::create_asset(
+            None,
+            Some(sender.clone()),
+            generic_asset::AssetOptions {
+                initial_issuance: amount,
+                permissions: default_permission,
+            },
+        )?;
+
         Ok(())
     }
 
-    fn get_free_balance(
-        assetId: T::AssetId,
-        from: T::AccountId,       
-    ) -> T::Balance {
-       return <generic_asset::Module<T>>::free_balance(&assetId, &from)
+    fn get_free_balance(assetId: T::AssetId, from: T::AccountId) -> T::Balance {
+        return <generic_asset::Module<T>>::free_balance(&assetId, &from);
     }
-  
+
     // //Read-only function to be used by RPC
     // pub fn get_exchange_input_price(
     //     input_asset_id: T::AssetId,
