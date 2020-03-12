@@ -2602,6 +2602,7 @@ dependencies = [
  "frame-executive",
  "frame-support",
  "frame-system",
+ "integer-sqrt",
  "pallet-aura",
  "pallet-balances",
  "pallet-generic-asset",
@@ -2951,6 +2952,7 @@ version = "2.0.0"
 dependencies = [
  "frame-support",
  "frame-system",
+ "integer-sqrt",
  "pallet-generic-asset",
  "parity-scale-codec",
  "safe-mix",

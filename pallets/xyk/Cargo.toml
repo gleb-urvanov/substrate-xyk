@@ -24,6 +24,9 @@ git = 'https://github.com/paritytech/substrate.git'
 rev = '3cc0973aff3f5b507c8ed1a13934bd35697b251f'
 version = '2.0.0'
 
+[dependencies.integer-sqrt]
+version = '0.1.3'
+
 [dependencies.codec]
 default-features = false
 features = ['derive']

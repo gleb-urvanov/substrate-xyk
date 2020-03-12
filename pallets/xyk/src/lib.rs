@@ -16,7 +16,8 @@ use frame_support::{
     traits::Randomness,
     StorageMap,
 };
-
+extern crate integer_sqrt;
+use integer_sqrt::IntegerSquareRoot;
 use generic_asset::{AssetOptions, Owner, PermissionLatest};
 use system::ensure_signed;
 
@@ -216,6 +217,104 @@ decl_module! {
                 Error::<T>::NotEnoughReserve,
             );
             let sold_asset_amount = Self::calculate_buy_price(
+                input_reserve,
+                output_reserve,
+                bought_asset_amount,
+            );
+            ensure!(
+                <generic_asset::Module<T>>::free_balance(&sold_asset_id, &sender) >= sold_asset_amount,
+                Error::<T>::NotEnoughAssets,
+            );
+            let vault = <VaultId<T>>::get();
+            <generic_asset::Module<T>>::make_transfer_with_event(
+                &sold_asset_id,
+                &sender,
+                &vault,
+                sold_asset_amount,
+            )?;
+            <generic_asset::Module<T>>::make_transfer_with_event(
+                &bought_asset_id,
+                &vault,
+                &sender,
+                bought_asset_amount,
+            )?;
+            <Pools<T>>::insert(
+                (sold_asset_id, bought_asset_id),
+                input_reserve + sold_asset_amount,
+            );
+            <Pools<T>>::insert(
+                (bought_asset_id, sold_asset_id),
+                output_reserve - bought_asset_amount,
+            );
+            Ok(())
+        }
+
+        fn sell_asset_thor (
+            origin,
+            sold_asset_id: T::AssetId,
+            bought_asset_id: T::AssetId,
+            sold_asset_amount: T::Balance,
+        ) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+            // TODO ensure sender has enough assets
+            ensure!(
+                <Pools<T>>::contains_key((sold_asset_id,bought_asset_id)),
+                Error::<T>::NoSuchPool,
+            );
+            let input_reserve = <Pools<T>>::get((sold_asset_id, bought_asset_id));
+            let output_reserve = <Pools<T>>::get((bought_asset_id, sold_asset_id));
+            let bought_asset_amount = Self::calculate_sell_price_thor(
+                input_reserve,
+                output_reserve,
+                sold_asset_amount,
+            );
+            ensure!(
+                <generic_asset::Module<T>>::free_balance(&sold_asset_id, &sender) >= sold_asset_amount,
+                Error::<T>::NotEnoughAssets,
+            );
+            let vault = <VaultId<T>>::get();
+            <generic_asset::Module<T>>::make_transfer_with_event(
+                &sold_asset_id,
+                &sender,
+                &vault,
+                sold_asset_amount,
+            )?;
+            <generic_asset::Module<T>>::make_transfer_with_event(
+                &bought_asset_id,
+                &vault,
+                &sender,
+                bought_asset_amount,
+            )?;
+            <Pools<T>>::insert(
+                (sold_asset_id, bought_asset_id),
+                input_reserve + sold_asset_amount,
+            );
+            <Pools<T>>::insert(
+                (bought_asset_id, sold_asset_id),
+                output_reserve - bought_asset_amount,
+            );
+            Ok(())
+        }
+        fn buy_asset_thor (
+            origin,
+            sold_asset_id: T::AssetId,
+            bought_asset_id: T::AssetId,
+            bought_asset_amount: T::Balance,
+        ) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+            ensure!(
+                <Pools<T>>::contains_key((sold_asset_id,bought_asset_id)),
+                Error::<T>::NoSuchPool,
+            );
+
+            let input_reserve = <Pools<T>>::get((sold_asset_id, bought_asset_id));
+            let output_reserve = <Pools<T>>::get((bought_asset_id, sold_asset_id));
+
+            ensure!(
+                output_reserve > bought_asset_amount,
+                Error::<T>::NotEnoughReserve,
+            );
+            let sold_asset_amount = Self::calculate_buy_price_thor(
                 input_reserve,
                 output_reserve,
                 bought_asset_amount,
@@ -465,6 +564,47 @@ impl<T: Trait> Module<T> {
 
     fn get_free_balance(assetId: T::AssetId, from: T::AccountId) -> T::Balance {
         return <generic_asset::Module<T>>::free_balance(&assetId, &from);
+    }
+
+    fn get_total_issuance(assetId: T::AssetId) -> T::Balance {
+        return <generic_asset::Module<T>>::total_issuance(&assetId);
+    }
+
+    pub fn calculate_sell_price_thor(
+        input_reserve: T::Balance,
+        output_reserve: T::Balance,
+        sell_amount: T::Balance,
+    ) -> T::Balance {
+        // y = (x * Y * X) / (x + X)^2
+        let numerator = sell_amount * output_reserve * input_reserve;
+        let denominator = (sell_amount + input_reserve) * (sell_amount + input_reserve);
+        numerator / denominator
+    }
+
+    pub fn calculate_buy_price_thor(
+        input_reserve: T::Balance,
+        output_reserve: T::Balance,
+        buy_amount: T::Balance,
+    ) -> T::Balance {
+        
+        let input_reserve_integer = input_reserve.saturated_into::<u64>(); //TODO check saturated conversion warning
+        let output_reserve_integer = output_reserve.saturated_into::<u64>();
+        let buy_amount_integer = buy_amount.saturated_into::<u64>();
+        let b = (input_reserve_integer * output_reserve_integer / buy_amount_integer - 2 * input_reserve_integer) as i128;
+        let c = (input_reserve_integer * input_reserve_integer) as i128;
+        let D = b * b - 4 * c;
+        let sqrtD = D.integer_sqrt();
+        let x1 = ((-b + sqrtD) / 2) as i128;
+        let x2 = ((-b - sqrtD) / 2) as i128;
+        let aprox = (input_reserve_integer * buy_amount_integer / output_reserve_integer) as i128;
+
+        if x1 - aprox < x2 - aprox{
+            return (x1 as u64).saturated_into::<T::Balance>()
+        }
+        else{
+            return (x2 as u64).saturated_into::<T::Balance>()
+        }
+        
     }
 
     // //Read-only function to be used by RPC
