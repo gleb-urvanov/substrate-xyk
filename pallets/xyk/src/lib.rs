@@ -7,14 +7,8 @@ use sp_runtime::traits::{BlakeTwo256, Hash, One, SaturatedConversion, Zero};
 
 use codec::{Decode, Encode};
 use frame_support::{
-    decl_event,
-    decl_module,
-    decl_storage, 
-    decl_error,
-    dispatch::DispatchResult, 
-    ensure, 
-    traits::Randomness,
-    StorageMap,
+    decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure,
+    traits::Randomness, StorageMap,
 };
 
 use generic_asset::{AssetOptions, Owner, PermissionLatest};
@@ -119,32 +113,32 @@ decl_module! {
                 Error::<T>::NotEnoughAssets,
             );
             <Pools<T>>::insert(
-                (first_asset_id, second_asset_id), first_asset_amount.clone()
+                (first_asset_id, second_asset_id), first_asset_amount
             );
             <Pools<T>>::insert(
-                (second_asset_id, first_asset_id), second_asset_amount.clone()
+                (second_asset_id, first_asset_id), second_asset_amount
             );
             let liquidity_asset_id = <generic_asset::Module<T>>::next_asset_id();
             <LiquidityAssets<T>>::insert(
-                (first_asset_id, second_asset_id), liquidity_asset_id.clone()
+                (first_asset_id, second_asset_id), liquidity_asset_id
             );
             <LiquidityPools<T>>::insert(
-                liquidity_asset_id.clone(), (first_asset_id, second_asset_id) 
+                liquidity_asset_id, (first_asset_id, second_asset_id)
             );
             let initial_liquidity = first_asset_amount + second_asset_amount; //for example, doesn't really matter
-            Self::create_asset(origin.clone(), initial_liquidity);
-           
+            Self::create_asset(origin, initial_liquidity);
+
             <generic_asset::Module<T>>::make_transfer_with_event(
                 &first_asset_id,
                 &sender,
                 &vault_address,
-                first_asset_amount.clone()
+                first_asset_amount
             )?;
             <generic_asset::Module<T>>::make_transfer_with_event(
                 &second_asset_id,
                 &sender,
                 &vault_address,
-                second_asset_amount.clone()
+                second_asset_amount
             )?;
             Ok(())
         }
@@ -262,7 +256,7 @@ decl_module! {
                  first_asset_id,
                  second_asset_id
             );
-           
+
             ensure!(
                 (<Pools<T>>::contains_key((first_asset_id, second_asset_id)) || <Pools<T>>::contains_key((second_asset_id, first_asset_id))),
                 Error::<T>::NoSuchPool,
@@ -446,14 +440,14 @@ impl<T: Trait> Module<T> {
         let sender = ensure_signed(origin)?;
 
         let default_permission = generic_asset::PermissionLatest {
-            update: Owner::Address(vault.clone()),
-            mint: Owner::Address(vault.clone()),
-            burn: Owner::Address(vault.clone()),
+            update: Owner::None,
+            mint: Owner::None,
+            burn: Owner::None,
         };
 
         <generic_asset::Module<T>>::create_asset(
             None,
-            Some(sender.clone()),
+            Some(sender),
             generic_asset::AssetOptions {
                 initial_issuance: amount,
                 permissions: default_permission,
