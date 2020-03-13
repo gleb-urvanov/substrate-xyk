@@ -443,9 +443,9 @@ impl<T: Trait> Module<T> {
         let sender = ensure_signed(origin)?;
 
         let default_permission = generic_asset::PermissionLatest {
-            update: Owner::None,
-            mint: Owner::None,
-            burn: Owner::None,
+            update: Owner::Address(vault.clone()),
+            mint: Owner::Address(vault.clone()),
+            burn: Owner::Address(vault.clone()),
         };
 
         <generic_asset::Module<T>>::create_asset(
