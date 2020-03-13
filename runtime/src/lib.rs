@@ -8,6 +8,7 @@
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
+use codec::{Decode, Encode, HasCompact, Input, Output, Error as CodecError};
 use generic_asset;
 use grandpa::fg_primitives;
 use grandpa::AuthorityList as GrandpaAuthorityList;
@@ -253,6 +254,7 @@ impl template::Trait for Runtime {
 
 impl xyk::Trait for Runtime {
     type Event = Event;
+    type Randomness = RandomnessCollectiveFlip;
 }
 
 construct_runtime!(
@@ -271,9 +273,9 @@ construct_runtime!(
 		Sudo: sudo::{Module, Call, Config<T>, Storage, Event<T>},
 		GenericAsset: generic_asset::{Module, Call, Config<T>, Storage, Event<T>},
 		// Used for the module template in `./template.rs`
-		TemplateModule: template::{Module, Call, Storage, Event<T>},
+        TemplateModule: template::{Module, Call, Storage, Event<T>},
+        RandomnessCollectiveFlip: randomness_collective_flip::{Module, Call, Storage},
 		Xyk: xyk::{Module, Call, Storage, Event<T>},
-		RandomnessCollectiveFlip: randomness_collective_flip::{Module, Call, Storage},
 	}
 );
 
