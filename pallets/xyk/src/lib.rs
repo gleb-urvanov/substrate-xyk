@@ -120,32 +120,32 @@ decl_module! {
                 Error::<T>::NotEnoughAssets,
             );
             <Pools<T>>::insert(
-                (first_asset_id, second_asset_id), first_asset_amount.clone()
+                (first_asset_id, second_asset_id), first_asset_amount
             );
             <Pools<T>>::insert(
-                (second_asset_id, first_asset_id), second_asset_amount.clone()
+                (second_asset_id, first_asset_id), second_asset_amount
             );
             let liquidity_asset_id = <generic_asset::Module<T>>::next_asset_id();
             <LiquidityAssets<T>>::insert(
-                (first_asset_id, second_asset_id), liquidity_asset_id.clone()
+                (first_asset_id, second_asset_id), liquidity_asset_id
             );
             <LiquidityPools<T>>::insert(
-                liquidity_asset_id.clone(), (first_asset_id, second_asset_id) 
+                liquidity_asset_id, (first_asset_id, second_asset_id) 
             );
             let initial_liquidity = first_asset_amount + second_asset_amount; //for example, doesn't really matter
-            Self::create_asset(origin.clone(), initial_liquidity);
+            Self::create_asset(origin, initial_liquidity);
            
             <generic_asset::Module<T>>::make_transfer_with_event(
                 &first_asset_id,
                 &sender,
                 &vault_address,
-                first_asset_amount.clone()
+                first_asset_amount
             )?;
             <generic_asset::Module<T>>::make_transfer_with_event(
                 &second_asset_id,
                 &sender,
                 &vault_address,
-                second_asset_amount.clone()
+                second_asset_amount
             )?;
             Ok(())
         }
@@ -540,7 +540,10 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    fn create_asset(origin: T::Origin, amount: T::Balance) -> DispatchResult {
+    fn create_asset(
+        origin: T::Origin,
+        amount: T::Balance,
+    ) -> DispatchResult {
         let vault: T::AccountId = <VaultId<T>>::get();
         let sender = ensure_signed(origin)?;
 
@@ -552,7 +555,7 @@ impl<T: Trait> Module<T> {
 
         <generic_asset::Module<T>>::create_asset(
             None,
-            Some(sender.clone()),
+            Some(sender),
             generic_asset::AssetOptions {
                 initial_issuance: amount,
                 permissions: default_permission,
@@ -562,11 +565,16 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
-    fn get_free_balance(assetId: T::AssetId, from: T::AccountId) -> T::Balance {
+    fn get_free_balance(
+        assetId: T::AssetId,
+        from: T::AccountId
+    ) -> T::Balance {
         return <generic_asset::Module<T>>::free_balance(&assetId, &from);
     }
 
-    fn get_total_issuance(assetId: T::AssetId) -> T::Balance {
+    fn get_total_issuance(
+        assetId: T::AssetId
+    ) -> T::Balance {
         return <generic_asset::Module<T>>::total_issuance(&assetId);
     }
 
