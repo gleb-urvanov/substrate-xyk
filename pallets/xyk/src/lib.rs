@@ -435,7 +435,10 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    fn create_asset(origin: T::Origin, amount: T::Balance) -> DispatchResult {
+    fn create_asset(
+        origin: T::Origin,
+        amount: T::Balance
+    ) -> DispatchResult {
         let vault: T::AccountId = <VaultId<T>>::get();
         let sender = ensure_signed(origin)?;
 
@@ -457,10 +460,18 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
-    fn get_free_balance(assetId: T::AssetId, from: T::AccountId) -> T::Balance {
+    fn get_free_balance(
+        assetId: T::AssetId,
+        from: T::AccountId
+    ) -> T::Balance {
         return <generic_asset::Module<T>>::free_balance(&assetId, &from);
     }
 
+    fn get_total_issuance(
+        assetId: T::AssetId
+    ) -> T::Balance {
+        return <generic_asset::Module<T>>::total_issuance(&assetId);
+    }
     // //Read-only function to be used by RPC
     // pub fn get_exchange_input_price(
     //     input_asset_id: T::AssetId,

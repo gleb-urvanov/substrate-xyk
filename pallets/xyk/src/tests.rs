@@ -56,12 +56,12 @@ pub trait Trait: generic_asset::Trait {
 fn initialize() {
 	XykStorage::set_vault_id(Origin::signed(1));
 	// creating asset with assetId 0 and minting to accountId 2
-	XykStorage::create_asset_to(
+	XykStorage::create_asset(
 		 Origin::signed(2),
 		1000000,
 	);
 	// creating asset with assetId 1 and minting to accountId 2
-	XykStorage::create_asset_to(
+	XykStorage::create_asset(
 		 Origin::signed(2),
 		1000000,
 	);
@@ -104,12 +104,12 @@ fn create_pool_W() {
 		// setting vault to accountId 1
 		XykStorage::set_vault_id(Origin::signed(1));
 		// creating asset with assetId 0 and minting to accountId 2
-		XykStorage::create_asset_to(
+		XykStorage::create_asset(
 		 	Origin::signed(2),
 			1000000,
 		);
 		// creating asset with assetId 1 and minting to accountId 2
-		XykStorage::create_asset_to(
+		XykStorage::create_asset(
 		 	Origin::signed(2),
 			1000000,
 		);
@@ -124,8 +124,9 @@ fn create_pool_W() {
 
 		assert_eq!(XykStorage::asset_pool((0, 1)), 500000); // amount in pool map
 		assert_eq!(XykStorage::asset_pool((1, 0)), 500000); // amount in pool map
-		assert_eq!(XykStorage::liquidity_pool((0, 1)), 2); // liquidity assetId corresponding to newly created pool
-		assert_eq!(XykStorage::totalliquidity(2), 1000000); // total liquidity assets
+		assert_eq!(XykStorage::liquidity_asset((0, 1)), 2); // liquidity assetId corresponding to newly created pool
+		assert_eq!(XykStorage::liquidity_pool(2),(0, 1)); // liquidity assetId corresponding to newly created pool
+		assert_eq!(XykStorage::get_total_issuance(2), 1000000); // total liquidity assets
 		assert_eq!(XykStorage::get_free_balance(2, 2), 1000000); // amount of liquidity assets owned by user by creating pool / initial minting (500+500)
 		assert_eq!(XykStorage::get_free_balance(0, 2), 500000); // amount in user acc after creating pool / initial minting 
 		assert_eq!(XykStorage::get_free_balance(1, 2), 500000); // amount in user acc after creating pool / initial minting 
@@ -219,7 +220,7 @@ fn mint_W() {
 			250000,
 		);
 
-		assert_eq!(XykStorage::totalliquidity(2), 1500000); // total liquidity assets
+		assert_eq!(XykStorage::get_total_issuance(2), 1500000); // total liquidity assets
 		assert_eq!(XykStorage::get_free_balance(2,2), 1500000); // amount of liquidity assets owned by user by creating pool and minting
 		assert_eq!(XykStorage::get_free_balance(0,2), 250000); // amount in user acc after minting 
 		assert_eq!(XykStorage::get_free_balance(1,2), 249999); // amount in user acc after minting 
@@ -241,7 +242,7 @@ fn mint_W_other_way() {
 			250000,
 		);
 
-		assert_eq!(XykStorage::totalliquidity(2), 1500000); // total liquidity assets
+		assert_eq!(XykStorage::get_total_issuance(2), 1500000); // total liquidity assets
 		assert_eq!(XykStorage::get_free_balance(2,2), 1500000); // amount of liquidity assets owned by user by creating pool and minting
 		assert_eq!(XykStorage::get_free_balance(0,2), 249999); // amount in user acc after minting 
 		assert_eq!(XykStorage::get_free_balance(1,2), 250000); // amount in user acc after minting 
@@ -317,7 +318,7 @@ fn burn_W() {
 			500000,
 		);
 
-		assert_eq!(XykStorage::totalliquidity(2), 500000); // total liquidity assets
+		assert_eq!(XykStorage::get_total_issuance(2), 500000); // total liquidity assets
 		assert_eq!(XykStorage::get_free_balance(2,2), 500000); // amount of liquidity assets owned by user by creating pool and burning
 		assert_eq!(XykStorage::get_free_balance(0,2), 750000); // amount in user acc after burning 
 		assert_eq!(XykStorage::get_free_balance(1,2), 750000); // amount in user acc after burning 
@@ -339,7 +340,7 @@ fn burn_W_other_way() {
 			500000,
 		);
 
-		assert_eq!(XykStorage::totalliquidity(2), 500000); // total liquidity assets
+		assert_eq!(XykStorage::get_total_issuance(2), 500000); // total liquidity assets
 		assert_eq!(XykStorage::get_free_balance(2,2), 500000); // amount of liquidity assets owned by user by creating pool and burning
 		assert_eq!(XykStorage::get_free_balance(0,2), 750000); // amount in user acc after burning 
 		assert_eq!(XykStorage::get_free_balance(1,2), 750000); // amount in user acc after burning 
@@ -391,12 +392,12 @@ fn sell_W() {
 		
 		XykStorage::set_vault_id(Origin::signed(1));
 		// creating asset with assetId 0 and minting to accountId 2
-		XykStorage::create_asset_to(
+		XykStorage::create_asset(
 			Origin::signed(2),
 			1000000,
 		);
 		// creating asset with assetId 1 and minting to accountId 2
-		XykStorage::create_asset_to(
+		XykStorage::create_asset(
 			Origin::signed(2),
 			1000000,
 		);
@@ -416,7 +417,7 @@ fn sell_W() {
 			250000,
 		);
 
-		assert_eq!(XykStorage::totalliquidity(2), 1000000); // total liquidity assets
+		assert_eq!(XykStorage::get_total_issuance(2), 1000000); // total liquidity assets
 		assert_eq!(XykStorage::get_free_balance(2,2), 1000000); // amount of liquidity assets owned by user by creating pool and initial minting
 		assert_eq!(XykStorage::get_free_balance(0,2), 250000); // amount in user acc after selling 
 		assert_eq!(XykStorage::get_free_balance(1,2), 666332); // amount in user acc after buying (check rounding should be 666333?)
@@ -438,7 +439,7 @@ fn sell_W_other_way() {
 			250000,
 		);
 
-		assert_eq!(XykStorage::totalliquidity(2), 1000000); // total liquidity assets
+		assert_eq!(XykStorage::get_total_issuance(2), 1000000); // total liquidity assets
 		assert_eq!(XykStorage::get_free_balance(2,2), 1000000); // amount of liquidity assets owned by user by creating pool and initial minting
 		assert_eq!(XykStorage::get_free_balance(0,2), 666332); // amount in user acc after selling 
 		assert_eq!(XykStorage::get_free_balance(1,2), 250000); // amount in user acc after buying (check rounding should be 666333?)
@@ -498,7 +499,7 @@ fn buy_W() {
 			150000,
 		);
 
-		assert_eq!(XykStorage::totalliquidity(2), 1000000); // total liquidity assets
+		assert_eq!(XykStorage::get_total_issuance(2), 1000000); // total liquidity assets
 		assert_eq!(XykStorage::get_free_balance(2,2), 1000000); // amount of liquidity assets owned by user by creating pool and initial minting
 		assert_eq!(XykStorage::get_free_balance(0,2), 285069); // amount in user acc after selling (check rounding)
 		assert_eq!(XykStorage::get_free_balance(1,2), 650000); // amount in user acc after buying (check rounding )
@@ -520,7 +521,7 @@ fn buy_W_other_way() {
 			150000,
 		);
 
-		assert_eq!(XykStorage::totalliquidity(2), 1000000); // total liquidity assets
+		assert_eq!(XykStorage::get_total_issuance(2), 1000000); // total liquidity assets
 		assert_eq!(XykStorage::get_free_balance(2,2), 1000000); // amount of liquidity assets owned by user by creating pool and initial minting
 		assert_eq!(XykStorage::get_free_balance(0,2), 650000); // amount in user acc after selling (check rounding)
 		assert_eq!(XykStorage::get_free_balance(1,2), 285069); // amount in user acc after buying (check rounding )
@@ -554,12 +555,12 @@ fn buy_N_not_enough_reserve() {
 		
 		XykStorage::set_vault_id(Origin::signed(1));
 		// creating asset with assetId 0 and minting to accountId 2
-		XykStorage::create_asset_to(
+		XykStorage::create_asset(
 			Origin::signed(2),
 			1000000,
 		);
 		// creating asset with assetId 1 and minting to accountId 2
-		XykStorage::create_asset_to(
+		XykStorage::create_asset(
 			Origin::signed(2),
 			1000000,
 		);
@@ -591,12 +592,12 @@ fn buy_N_not_enough_selling_assset() {
 		
 		XykStorage::set_vault_id(Origin::signed(1));
 		// creating asset with assetId 0 and minting to accountId 2
-		XykStorage::create_asset_to(
+		XykStorage::create_asset(
 			Origin::signed(2),
 			600000,
 		);
 		// creating asset with assetId 1 and minting to accountId 2
-		XykStorage::create_asset_to(
+		XykStorage::create_asset(
 			Origin::signed(2),
 			600000,
 		);
@@ -621,32 +622,3 @@ fn buy_N_not_enough_selling_assset() {
 		);
 	});
 }
-
-//sell working assert (values as vault, values at vallet, values at maps)
-//sell not working if not enough asset to sell
-//sell not working if not enough liquidity in pool
-//sell not working if pool does not exist
-
-//buy working assert (values as vault, values at vallet, values at maps)
-//buy not working if not enough asset to sell
-//buy not working if not enough liquidity in pool
-//buy not working if pool does not exist
-
-//create_pool working assert (right values in maps and accounts)
-//create_pool not working if no such assets
-//create_pool not working if pool already exists
-//create_pool not working if pool already exists other way around (create pool X-Y, but pool Y-X exists)
-//create_pool not working if no next hash/accId
-
-//mint working assert (values as vault, values at vallet, values at maps)
-//mint working if liquidity 0 assert (values as vault, values at vallet, values at maps)
-//mint working if mint order in different order as pool (mint pool X-Y, but pool Y-X exists), assert (values as vault, values at vallet, values at maps)
-//mint not working if pool does not exist
-//mint not enough assets to mint with
-
-//burn working assert (values as vault, values at vallet, values at maps)
-//burn working if burn order in different order as pool (mint pool X-Y, but pool Y-X exists), assert (values as vault, values at vallet, values at maps)
-//burn not working if pool does not exist
-//burn not enough liquidity assets to burn
-//burn not working if not enough pool assets? (if maps are correct, previous test should fail)
-
