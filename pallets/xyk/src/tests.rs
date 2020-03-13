@@ -549,28 +549,6 @@ fn buy_W() {
 }
 
 #[test]
-fn buy_thor_W() {
-	new_test_ext().execute_with(|| {
-		
-		initialize();
-		// buying 150000 liquidity assetId 1 of pool 0 1
-		XykStorage::buy_asset_thor(
-			Origin::signed(2),
-			0,
-			1,
-			100000,
-		);
-
-		assert_eq!(XykStorage::get_total_issuance(2), 1000000); // total liquidity assets
-		assert_eq!(XykStorage::get_free_balance(2,2), 1000000); // amount of liquidity assets owned by user by creating pool and initial minting
-		assert_eq!(XykStorage::get_free_balance(0,2), 500000); // amount in user acc after selling (check rounding) 309017
-		assert_eq!(XykStorage::get_free_balance(1,2), 500000); // amount in user acc after buying (check rounding ) 600000
-		assert_eq!(XykStorage::get_free_balance(0,1), 690983); // amount in vault acc (check rounding)
-		assert_eq!(XykStorage::get_free_balance(1,1), 400000); // amount in vault acc (check rounding)
-	});
-}
-
-#[test]
 fn buy_W_other_way() {
 	new_test_ext().execute_with(|| {
 		
