@@ -397,6 +397,7 @@ impl<T: Trait> Module<T> {
         return (new_random).using_encoded(<T as system::Trait>::Hashing::hash);
     }
 
+    //TODO all math operations must be checked for overflow 
     pub fn calculate_sell_price(
         input_reserve: T::Balance,
         output_reserve: T::Balance,
