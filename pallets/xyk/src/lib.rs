@@ -3,9 +3,8 @@
 /// For more guidance on Substrate modules, see the example module
 /// https://github.com/paritytech/substrate/blob/master/frame/example/src/lib.rs
 // TODO documentation!
-use sp_runtime::traits::{BlakeTwo256, Hash, One, SaturatedConversion, Zero, AccountIdConversion };
-use sp_runtime::{ModuleId};
-
+use sp_runtime::traits::{AccountIdConversion, BlakeTwo256, Hash, One, SaturatedConversion, Zero};
+use sp_runtime::ModuleId;
 
 use codec::{Decode, Encode, Error as CodecError};
 use frame_support::{
@@ -17,6 +16,7 @@ use frame_support::{
 
 use generic_asset::{AssetOptions, Owner, PermissionLatest};
 use system::ensure_signed;
+use Error::Overflow;
 
 #[cfg(test)]
 mod mock;
@@ -32,7 +32,7 @@ pub trait Trait: generic_asset::Trait {
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
     //type AccountId = T::AccountId;
     //type AccountId: frame_system::AccountId;
-  //  type AccountId: <T as system::Trait>::Hashing::hash;
+    //  type AccountId: <T as system::Trait>::Hashing::hash;
 }
 
 decl_error! {
@@ -108,7 +108,7 @@ decl_module! {
             let vault_address: T::AccountId  = Self::new_account_id(sender.clone());
             //  TODO ensure assets exists ?
             //  TODO asset1 != asset2
-           
+
             ensure!(
                 !<VaultId<T>>::contains_key((first_asset_id, second_asset_id)),
                 Error::<T>::PoolAlreadyExists,
@@ -145,7 +145,17 @@ decl_module! {
             <LiquidityPools<T>>::insert(
                 liquidity_asset_id, (first_asset_id, second_asset_id)
             );
-            let initial_liquidity = first_asset_amount + second_asset_amount; //for example, doesn't really matter
+
+            let first_asset_amount_integer = first_asset_amount.saturated_into::<u128>();
+            let second_asset_amount_integer = second_asset_amount.saturated_into::<u128>();
+            let initial_liquidity_integer = first_asset_amount_integer.checked_add(second_asset_amount_integer).ok_or(Error::<T>::Overflow);
+            ensure!(
+                !initial_liquidity_integer.is_err(),
+                Error::<T>::Overflow,
+            );
+
+
+            let initial_liquidity = initial_liquidity_integer?.saturated_into::<T::Balance>(); //for example, doesn't really matter
             Self::create_asset(origin, initial_liquidity);
 
             <generic_asset::Module<T>>::make_transfer_with_event(
@@ -186,7 +196,7 @@ decl_module! {
                 output_reserve,
                 sold_asset_amount,
             );
-        
+
             ensure!(
                 !bought_asset_integer.is_err(),
                 Error::<T>::Overflow,
@@ -199,7 +209,7 @@ decl_module! {
                 Error::<T>::NotEnoughAssets,
             );
 
-            
+
             <generic_asset::Module<T>>::make_transfer_with_event(
                 &sold_asset_id,
                 &sender,
@@ -243,16 +253,24 @@ decl_module! {
                 output_reserve > bought_asset_amount,
                 Error::<T>::NotEnoughReserve,
             );
-            let sold_asset_amount = Self::calculate_buy_price(
+            let sold_asset_amount_integer = Self::calculate_buy_price(
                 input_reserve,
                 output_reserve,
                 bought_asset_amount,
             );
+
+            ensure!(
+                !sold_asset_amount_integer.is_err(),
+                Error::<T>::Overflow,
+            );
+
+            let sold_asset_amount = sold_asset_amount_integer.unwrap().saturated_into::<T::Balance>();
+
             ensure!(
                 <generic_asset::Module<T>>::free_balance(&sold_asset_id, &sender) >= sold_asset_amount,
                 Error::<T>::NotEnoughAssets,
             );
-            
+
             <generic_asset::Module<T>>::make_transfer_with_event(
                 &sold_asset_id,
                 &sender,
@@ -283,7 +301,7 @@ decl_module! {
             first_asset_amount: T::Balance,
         ) -> DispatchResult {
             let sender = ensure_signed(origin)?;
-            
+
             //get liquidity_asset_id of selected pool
             let liquidity_asset_id = Self::get_liquidity_asset(
                  first_asset_id,
@@ -315,7 +333,7 @@ decl_module! {
                 <generic_asset::Module<T>>::free_balance(&second_asset_id, &sender) >= second_asset_amount,
                 Error::<T>::NotEnoughAssets,
             );
-          
+
             <generic_asset::Module<T>>::make_transfer_with_event(
                 &first_asset_id,
                 &sender,
@@ -434,65 +452,67 @@ impl<T: Trait> Module<T> {
     //     T::AccountId::decode(new_random).unwrap_or_default()
     // }
 
-    
     pub fn new_account_id(who: T::AccountId) -> T::AccountId {
         let new_nonce = <Nonce>::get() + 1;
         <Nonce>::put(new_nonce);
-		let entropy = (b"modlpy/utilisuba", who, new_nonce).using_encoded(|b| BlakeTwo256::hash(b));
-		T::AccountId::decode(&mut &entropy[..]).unwrap_or_default()
+        let entropy = (b"modlpy/utilisuba", who, new_nonce).using_encoded(|b| BlakeTwo256::hash(b));
+        T::AccountId::decode(&mut &entropy[..]).unwrap_or_default()
     }
 
-   
-    
-    //TODO all math operations must be checked for overflow 
+    //TODO all math operations must be checked for overflow
     pub fn calculate_sell_price(
         input_reserve: T::Balance,
         output_reserve: T::Balance,
         sell_amount: T::Balance,
-    ) -> Result<u128, Error::<T>> {
+    ) -> Result<u128, Error<T>> {
         let input_reserve_integer = input_reserve.saturated_into::<u128>();
         let output_reserve_integer = output_reserve.saturated_into::<u128>();
         let sell_amount_integer = sell_amount.saturated_into::<u128>();
 
-        //let input_amount_with_fee = sell_amount_integer.checked_mul(997).ok_or(Error::VaultAlreadySet)?;
-        let input_amount_with_fee = 100_u128.checked_mul(997_u128).ok_or(Error::Overflow)?;
-       // current_total_issuance.checked_add(&amount).ok_or(Error::<T>::TotalMintingOverflow)?             
-        let numerator = input_amount_with_fee.checked_mul(output_reserve_integer).ok_or(Error::<T>::Overflow)?;
-        let denominator = input_reserve_integer.checked_mul(1000).ok_or(Error::<T>::Overflow)?.checked_add(input_amount_with_fee).ok_or(Error::<T>::Overflow)?;
-        numerator.checked_div(denominator).ok_or(Error::<T>::Overflow)
+        let input_amount_with_fee = sell_amount_integer
+            .checked_mul(997_u128)
+            .ok_or(Error::Overflow)?;
+        let numerator = input_amount_with_fee
+            .checked_mul(output_reserve_integer)
+            .ok_or(Error::<T>::Overflow)?;
+        let denominator = input_reserve_integer
+            .checked_mul(1000_u128)
+            .ok_or(Error::<T>::Overflow)?
+            .checked_add(input_amount_with_fee)
+            .ok_or(Error::<T>::Overflow)?;
+        numerator
+            .checked_div(denominator)
+            .ok_or(Error::<T>::Overflow)
     }
-
-
-   
-    // pub fn calculate_sell_price2(
-    //     input_reserve: T::Balance,
-    //     output_reserve: T::Balance,
-    //     sell_amount: T::Balance,
-    // ) -> Option<u128> {
-    //     let input_reserve_integer = input_reserve.saturated_into::<u128>();
-    //     let output_reserve_integer = input_reserve.saturated_into::<u128>();
-    //     let sell_amount_integer = sell_amount.saturated_into::<u128>();
-
-    //     let xyk_y1 = input_reserve_integer.checked_mul(output_reserve_integer)? / (input_reserve_integer.checked_add(sell_amount_integer)?);
-    //     let fee = xyk_y1.checked_mul(1000)? / output_reserve_integer;
-    //     let input_amount_with_fee = sell_amount_integer.checked_mul(fee)?;
-    //     let numerator = input_amount_with_fee.checked_mul(output_reserve_integer)?;
-    //     let denominator = input_reserve_integer.checked_mul(1000)?.checked_add(input_amount_with_fee)?;
-    //     numerator.checked_div(denominator)
-    // }
-
-
 
     pub fn calculate_buy_price(
         input_reserve: T::Balance,
         output_reserve: T::Balance,
         buy_amount: T::Balance,
-    ) -> T::Balance {
+    ) -> Result<u128, Error<T>> {
+        let input_reserve_integer = input_reserve.saturated_into::<u128>();
+        let output_reserve_integer = output_reserve.saturated_into::<u128>();
+        let buy_amount_integer = buy_amount.saturated_into::<u128>();
+
         // numerator: uint256 = input_reserve * output_amount * 1000
-        let numerator = input_reserve * buy_amount * 1000.saturated_into::<T::Balance>();
+        //let numerator = input_reserve * buy_amount * 1000.saturated_into::<T::Balance>();
+        let numerator = input_reserve_integer
+            .checked_mul(buy_amount_integer)
+            .ok_or(Error::<T>::Overflow)?
+            .checked_mul(1000_u128)
+            .ok_or(Error::<T>::Overflow)?;
         // denominator: uint256 = (output_reserve - output_amount) * 997
-        let denominator = (output_reserve - buy_amount) * 997.saturated_into::<T::Balance>();
-        numerator / denominator + 1.saturated_into::<T::Balance>()
+        // let denominator = (output_reserve - buy_amount) * 997.saturated_into::<T::Balance>();
+        let denominator = output_reserve_integer
+            .checked_sub(buy_amount_integer)
+            .ok_or(Error::<T>::NotEnoughReserve)?
+            .checked_mul(997_u128)
+            .ok_or(Error::<T>::Overflow)?;
+        numerator
+            .checked_div(denominator)
+            .ok_or(Error::<T>::Overflow)?
+            .checked_add(1_u128)
+            .ok_or(Error::<T>::Overflow)
     }
 
     pub fn get_liquidity_asset(
@@ -506,10 +526,7 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    fn create_asset(
-        origin: T::Origin,
-        amount: T::Balance
-    ) -> DispatchResult {
+    fn create_asset(origin: T::Origin, amount: T::Balance) -> DispatchResult {
         let vault: T::AccountId = <SuperVaultId<T>>::get();
         let sender = ensure_signed(origin)?;
 
@@ -531,16 +548,11 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
-    fn get_free_balance(
-        assetId: T::AssetId,
-        from: T::AccountId
-    ) -> T::Balance {
+    fn get_free_balance(assetId: T::AssetId, from: T::AccountId) -> T::Balance {
         return <generic_asset::Module<T>>::free_balance(&assetId, &from);
     }
 
-    fn get_total_issuance(
-        assetId: T::AssetId
-    ) -> T::Balance {
+    fn get_total_issuance(assetId: T::AssetId) -> T::Balance {
         return <generic_asset::Module<T>>::total_issuance(&assetId);
     }
     // //Read-only function to be used by RPC
